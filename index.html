@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TournéePro — Planification de tournées commerciales & livraison</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🚚</span>
+      <div>
+        <h1>TournéePro</h1>
+        <p>Planification de tournées commerciales & livraison</p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-view="plan">Tournée</button>
+      <button class="tab" data-view="field">📍 Terrain</button>
+      <button class="tab" data-view="crm" data-stage="prospect">🎯 Prospection</button>
+      <button class="tab" data-view="crm" data-stage="client">👥 Clients</button>
+      <button class="tab" data-view="agenda">📅 Agenda</button>
+      <button class="tab" data-view="kpi">📊 KPI</button>
+      <button class="tab" data-view="settings">⚙️ Paramètres</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ VUE TOURNÉE ============ -->
+    <section id="view-plan" class="view active">
+      <div class="layout">
+        <!-- Colonne gauche : paramètres + arrêts -->
+        <aside class="panel">
+          <div class="card">
+            <div class="card-head"><h2>Mes tournées</h2></div>
+            <div class="field">
+              <label>Charger une tournée enregistrée</label>
+              <div class="inline">
+                <select id="tour-load"><option value="">— Sélectionner —</option></select>
+                <button id="tour-delete" class="btn small" title="Supprimer">🗑️</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Nom de la tournée</label>
+              <input id="tour-name" type="text" placeholder="Ex : Tournée Paris Centre - Lundi" />
+            </div>
+            <label class="check">
+              <input type="checkbox" id="tour-recurring" />
+              Tournée récurrente (modèle réutilisable)
+            </label>
+            <button id="tour-save" class="btn primary full">💾 Enregistrer cette tournée</button>
+          </div>
+
+          <div class="card">
+            <h2>Point de départ</h2>
+            <div class="field">
+              <label>Adresse de départ (dépôt)</label>
+              <div class="inline">
+                <input id="depot-input" type="text" placeholder="Ex : 10 rue de la Paix, Paris" />
+                <button id="depot-set" class="btn small">📍</button>
+              </div>
+              <small id="depot-status" class="muted"></small>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="return-depot" checked />
+              Retour au dépôt en fin de tournée
+            </label>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Arrêts de la tournée</h2>
+              <span id="stop-count" class="badge">0</span>
+            </div>
+            <div class="field">
+              <label>Ajouter un client à la tournée</label>
+              <input id="client-search" class="search full" type="text" placeholder="🔍 Rechercher un contact…" />
+              <select id="client-picker" size="1"></select>
+              <button id="add-stop" class="btn primary full">+ Ajouter l'arrêt</button>
+            </div>
+            <ul id="stop-list" class="stop-list"></ul>
+            <button id="optimize" class="btn full">⚡ Optimiser l'ordre (plus proche)</button>
+          </div>
+
+          <div class="card">
+            <h2>Paramètres de coût</h2>
+            <div class="grid2">
+              <div class="field">
+                <label>Prix carburant (€/L)</label>
+                <input id="fuel-price" type="number" step="0.01" value="1.85" />
+              </div>
+              <div class="field">
+                <label>Conso (L/100 km)</label>
+                <input id="consumption" type="number" step="0.1" value="7.5" />
+              </div>
+              <div class="field">
+                <label>Temps / arrêt (min)</label>
+                <input id="stop-time" type="number" step="1" value="15" />
+              </div>
+              <div class="field">
+                <label>Coût horaire (€/h)</label>
+                <input id="hourly-cost" type="number" step="1" value="0" />
+              </div>
+              <div class="field">
+                <label>Heure de départ (option.)</label>
+                <input id="depart-time" type="time" />
+              </div>
+            </div>
+            <button id="calc" class="btn primary full">🧮 Calculer la tournée</button>
+          </div>
+        </aside>
+
+        <!-- Colonne centre : carte -->
+        <div class="map-wrap">
+          <div id="map"></div>
+        </div>
+
+        <!-- Colonne droite : résultats -->
+        <aside class="panel results">
+          <div class="card enjeu-card">
+            <div class="enjeu-lbl">💪 Enjeu CA de la tournée</div>
+            <div class="enjeu-val" id="enjeu-pot">—</div>
+            <div class="enjeu-sub" id="enjeu-sub">potentiel à aller chercher</div>
+          </div>
+          <div class="card">
+            <h2>Résumé de la tournée</h2>
+            <div class="stats">
+              <div class="stat"><span class="stat-val" id="r-distance">—</span><span class="stat-lbl">Distance</span></div>
+              <div class="stat"><span class="stat-val" id="r-driving">—</span><span class="stat-lbl">Conduite</span></div>
+              <div class="stat"><span class="stat-val" id="r-total-time">—</span><span class="stat-lbl">Durée totale</span></div>
+              <div class="stat"><span class="stat-val" id="r-stops">—</span><span class="stat-lbl">Arrêts</span></div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-row"><span>Carburant</span><strong id="r-fuel">—</strong></div>
+              <div class="cost-row"><span>Litres consommés</span><strong id="r-liters">—</strong></div>
+              <div class="cost-row"><span>Main d'œuvre</span><strong id="r-labor">—</strong></div>
+              <div class="cost-row total"><span>Coût total estimé</span><strong id="r-total-cost">—</strong></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Feuille de route</h2>
+            <ol id="roadbook" class="roadbook"><li class="muted">Calculez la tournée pour voir le détail.</li></ol>
+            <button id="export-csv" class="btn full">⬇ Exporter (CSV)</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ VUE TERRAIN (mobile) ============ -->
+    <section id="view-field" class="view">
+      <div class="field-wrap">
+        <div class="field-banner">
+          <div class="fb-enjeu">
+            <span class="fb-enjeu-lbl">💪 Enjeu CA</span>
+            <span class="fb-enjeu-val" id="field-enjeu">—</span>
+          </div>
+          <div class="fb-gauge">
+            <div class="fb-gauge-head"><span id="field-gauge-text">0 / 0 points</span><span id="field-gauge-rest" class="fb-rest"></span></div>
+            <div class="fb-gauge-bar"><span id="field-gauge-fill"></span></div>
+          </div>
+        </div>
+        <div class="field-top">
+          <div class="field-modes">
+            <button class="fmode active" data-mode="date">📅 À visiter</button>
+            <button class="fmode" data-mode="tour">🚚 Tournée</button>
+          </div>
+          <div id="fctrl-date" class="fctrl">
+            <input type="date" id="field-date" />
+            <select id="field-stage-filter">
+              <option value="all">Tous</option>
+              <option value="prospect">Prospects</option>
+              <option value="client">Clients</option>
+            </select>
+          </div>
+          <div id="fctrl-tour" class="fctrl" style="display:none">
+            <select id="field-tour-select"><option value="">— Choisir une tournée —</option></select>
+          </div>
+          <label class="check" style="font-size:13px"><input type="checkbox" id="field-hide-done" checked /> Masquer les points validés</label>
+        </div>
+        <div id="field-list" class="field-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ VUE CRM (Prospection / Clients) ============ -->
+    <section id="view-crm" class="view">
+      <div class="crm-layout">
+        <div class="card">
+          <h2 id="crm-form-title">Nouveau prospect</h2>
+          <input type="hidden" id="c-id" />
+          <div class="grid2">
+            <div class="field"><label>Nom / Société *</label><input id="c-name" type="text" /></div>
+            <div class="field"><label>Contact</label><input id="c-contact" type="text" /></div>
+            <div class="field"><label>Téléphone</label><input id="c-phone" type="text" /></div>
+            <div class="field"><label>Email</label><input id="c-email" type="text" /></div>
+          </div>
+          <div class="field"><label>Adresse *</label>
+            <div class="inline">
+              <input id="c-address" type="text" placeholder="Adresse complète" />
+              <button id="c-geocode" class="btn small">📍 Localiser</button>
+            </div>
+            <small id="c-geo-status" class="muted"></small>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Type de commerce</label>
+              <select id="c-btype">
+                <option>Commerce</option><option>Restaurant</option><option>Hôtellerie</option>
+                <option>Garage</option><option>Salon de beauté</option><option>Artisan</option>
+                <option>Taxi/VTC</option><option>Freelance</option><option>Autre</option>
+              </select>
+            </div>
+            <div class="field" id="c-sub-wrap" style="display:none"><label>Sous-type</label>
+              <select id="c-bsub"><option>Hôtel</option><option>Airbnb</option><option>Gîte</option></select>
+            </div>
+            <div class="field"><label>Priorité</label>
+              <select id="c-priority"><option>Normale</option><option>Haute</option><option>Basse</option></select>
+            </div>
+            <div class="field" id="c-pstatus-wrap"><label>Statut prospection</label>
+              <select id="c-pstatus">
+                <option>À contacter</option><option>Contacté</option><option>RDV pris</option>
+                <option>En négociation</option><option>Gagné</option><option>Perdu</option>
+              </select>
+            </div>
+            <div class="field"><label>Relance auto (jours)</label>
+              <div class="inline">
+                <select id="c-relance">
+                  <option value="15">15 jours</option><option value="30" selected>30 jours</option>
+                  <option value="45">45 jours</option><option value="60">60 jours</option>
+                  <option value="90">90 jours</option><option value="custom">Personnalisé…</option>
+                </select>
+                <input id="c-relance-custom" type="number" min="1" placeholder="jours" style="display:none;max-width:90px" />
+              </div>
+            </div>
+            <div class="field"><label>CA potentiel estimé (€)</label>
+              <input id="c-potentiel" type="number" step="0.01" placeholder="Ex : 2000" />
+            </div>
+          </div>
+          <div class="field"><label>Notes</label><textarea id="c-notes" rows="2"></textarea></div>
+
+          <!-- Deals financiers -->
+          <div class="subcard">
+            <div class="card-head"><h3>💶 Deals réalisés <span id="deals-total" class="badge"></span></h3></div>
+            <div id="deals-list" class="mini-list"></div>
+            <div class="deal-add">
+              <input id="d-date" type="date" />
+              <input id="d-amount" type="number" placeholder="Montant €" step="0.01" />
+              <input id="d-label" type="text" placeholder="Objet (ex: contrat)" />
+              <button id="d-add" class="btn small">+</button>
+            </div>
+          </div>
+
+          <!-- Historique passages -->
+          <div class="subcard">
+            <div class="card-head"><h3>📍 Historique des passages</h3></div>
+            <div id="visits-list" class="mini-list"><span class="muted">Aucun passage enregistré.</span></div>
+            <small id="relance-info" class="muted"></small>
+          </div>
+
+          <div class="inline wrap">
+            <button id="c-save" class="btn primary">💾 Enregistrer</button>
+            <button id="c-convert" class="btn" style="display:none">⮕ Basculer en client</button>
+            <button id="c-reset" class="btn">Annuler</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 id="crm-list-title">Fichier prospects</h2>
+            <input id="crm-search" class="search" type="text" placeholder="🔍 Rechercher…" />
+          </div>
+          <div class="filters">
+            <select id="f-priority"><option value="">Priorité : toutes</option><option>Haute</option><option>Normale</option><option>Basse</option></select>
+            <select id="f-sort">
+              <option value="name">Tri : Nom (A→Z)</option>
+              <option value="ca-desc">CA ↓ (décroissant)</option>
+              <option value="ca-asc">CA ↑ (croissant)</option>
+              <option value="relance">Relance la + proche</option>
+            </select>
+            <input id="f-ca-min" type="number" class="ca-range" placeholder="CA min €" />
+            <input id="f-ca-max" type="number" class="ca-range" placeholder="CA max €" />
+          </div>
+          <div class="table-wrap">
+            <table class="crm-table">
+              <thead><tr>
+                <th>Nom</th><th>Commerce</th><th id="th-status">Statut</th>
+                <th>Adresse</th><th>Relance</th><th>CA</th><th></th>
+              </tr></thead>
+              <tbody id="crm-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VUE AGENDA / CA ============ -->
+    <section id="view-agenda" class="view">
+      <!-- Dashboard CA -->
+      <div class="card">
+        <div class="card-head">
+          <h2>💰 Chiffre d'affaires</h2>
+          <div class="inline">
+            <input type="date" id="ca-from" /> <span class="muted" style="align-self:center">→</span> <input type="date" id="ca-to" />
+          </div>
+        </div>
+        <div class="stats stats4">
+          <div class="stat"><span class="stat-val" id="ca-contracted">—</span><span class="stat-lbl">CA contracté (période)</span></div>
+          <div class="stat"><span class="stat-val" id="ca-potential">—</span><span class="stat-lbl">CA potentiel (prospects)</span></div>
+          <div class="stat"><span class="stat-val" id="ca-total-contracted">—</span><span class="stat-lbl">CA contracté total</span></div>
+          <div class="stat"><span class="stat-val" id="ca-pipeline">—</span><span class="stat-lbl">Pipeline (contracté + potentiel)</span></div>
+        </div>
+      </div>
+
+      <!-- Relances à venir -->
+      <div class="card">
+        <div class="card-head">
+          <h2>🔔 Relances à venir</h2>
+          <select id="agenda-filter">
+            <option value="all">Tous</option><option value="prospect">Prospects</option><option value="client">Clients</option>
+          </select>
+        </div>
+        <div id="agenda-table" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <!-- ============ VUE KPI ============ -->
+    <section id="view-kpi" class="view">
+      <div class="card">
+        <div class="card-head">
+          <h2>📊 Indicateurs de performance</h2>
+          <div class="seg" id="kpi-period">
+            <button class="seg-btn active" data-p="day">Jour</button>
+            <button class="seg-btn" data-p="week">Semaine</button>
+            <button class="seg-btn" data-p="month">Mois</button>
+          </div>
+        </div>
+        <p class="muted" id="kpi-range" style="font-size:12px"></p>
+        <div id="kpi-cards" class="kpi-grid"></div>
+      </div>
+    </section>
+
+    <!-- ============ VUE PARAMÈTRES ============ -->
+    <section id="view-settings" class="view">
+      <div class="settings-head">
+        <h2>⚙️ Paramètres</h2>
+        <p class="muted">Configuration de l'application : objectifs, statuts et valeurs par défaut.</p>
+      </div>
+
+      <!-- Objectifs -->
+      <div class="card">
+        <div class="card-head"><h2>🎯 Objectifs commerciaux</h2></div>
+        <p class="muted" style="font-size:12px">Définissez vos objectifs par période. Ils servent au calcul du taux d'accomplissement dans l'onglet KPI.</p>
+        <div class="table-wrap">
+          <table class="crm-table obj-table">
+            <thead><tr><th>Période</th><th>Points de contact</th><th>Ventes</th><th>CA (€)</th></tr></thead>
+            <tbody>
+              <tr><td>Jour</td>
+                <td><input type="number" id="obj-day-points" /></td>
+                <td><input type="number" id="obj-day-ventes" /></td>
+                <td><input type="number" id="obj-day-ca" /></td></tr>
+              <tr><td>Semaine</td>
+                <td><input type="number" id="obj-week-points" /></td>
+                <td><input type="number" id="obj-week-ventes" /></td>
+                <td><input type="number" id="obj-week-ca" /></td></tr>
+              <tr><td>Mois</td>
+                <td><input type="number" id="obj-month-points" /></td>
+                <td><input type="number" id="obj-month-ventes" /></td>
+                <td><input type="number" id="obj-month-ca" /></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <button id="obj-save" class="btn primary" style="margin-top:8px">💾 Enregistrer les objectifs</button>
+      </div>
+
+      <!-- Statuts personnalisables -->
+      <div class="card">
+        <div class="card-head"><h2>🏷️ Statuts personnalisés</h2></div>
+        <p class="muted" style="font-size:12px">Un statut par ligne. « Gagné » bascule automatiquement un prospect en client. Modifiez puis enregistrez.</p>
+        <div class="grid2">
+          <div class="field"><label>Statuts Prospection</label><textarea id="st-prospect" rows="7"></textarea></div>
+          <div class="field"><label>Statuts Terrain (clients)</label><textarea id="st-client" rows="7"></textarea></div>
+        </div>
+        <div class="inline">
+          <button id="st-save" class="btn primary">💾 Enregistrer les statuts</button>
+          <button id="st-reset" class="btn">Réinitialiser</button>
+        </div>
+      </div>
+
+      <!-- Valeurs de coût par défaut -->
+      <div class="card">
+        <div class="card-head"><h2>⛽ Coûts par défaut (tournée)</h2></div>
+        <p class="muted" style="font-size:12px">Valeurs pré-remplies à l'ouverture d'une nouvelle tournée.</p>
+        <div class="grid2">
+          <div class="field"><label>Prix carburant (€/L)</label><input id="set-fuel" type="number" step="0.01" /></div>
+          <div class="field"><label>Consommation (L/100 km)</label><input id="set-consumption" type="number" step="0.1" /></div>
+          <div class="field"><label>Temps / arrêt (min)</label><input id="set-stoptime" type="number" step="1" /></div>
+          <div class="field"><label>Coût horaire (€/h)</label><input id="set-hourly" type="number" step="1" /></div>
+        </div>
+        <button id="set-save" class="btn primary" style="margin-top:8px">💾 Enregistrer les valeurs par défaut</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/crm.js"></script>
+  <script src="js/route.js"></script>
+  <script src="js/field.js"></script>
+  <script src="js/agenda.js"></script>
+  <script src="js/kpi.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

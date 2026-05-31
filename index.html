@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TournéePro — Planification de tournées commerciales & livraison</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🚚</span>
+      <div>
+        <h1>TournéePro</h1>
+        <p>Planification de tournées commerciales & livraison</p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-view="plan">Tournée</button>
+      <button class="tab" data-view="field">📍 Terrain</button>
+      <button class="tab" data-view="crm">CRM Clients</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ VUE TOURNÉE ============ -->
+    <section id="view-plan" class="view active">
+      <div class="layout">
+        <!-- Colonne gauche : paramètres + arrêts -->
+        <aside class="panel">
+          <div class="card">
+            <div class="card-head"><h2>Mes tournées</h2></div>
+            <div class="field">
+              <label>Charger une tournée enregistrée</label>
+              <div class="inline">
+                <select id="tour-load"><option value="">— Sélectionner —</option></select>
+                <button id="tour-delete" class="btn small" title="Supprimer">🗑️</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Nom de la tournée</label>
+              <input id="tour-name" type="text" placeholder="Ex : Tournée Paris Centre - Lundi" />
+            </div>
+            <label class="check">
+              <input type="checkbox" id="tour-recurring" />
+              Tournée récurrente (modèle réutilisable)
+            </label>
+            <button id="tour-save" class="btn primary full">💾 Enregistrer cette tournée</button>
+          </div>
+
+          <div class="card">
+            <h2>Point de départ</h2>
+            <div class="field">
+              <label>Adresse de départ (dépôt)</label>
+              <div class="inline">
+                <input id="depot-input" type="text" placeholder="Ex : 10 rue de la Paix, Paris" />
+                <button id="depot-set" class="btn small">📍</button>
+              </div>
+              <small id="depot-status" class="muted"></small>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="return-depot" checked />
+              Retour au dépôt en fin de tournée
+            </label>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Arrêts de la tournée</h2>
+              <span id="stop-count" class="badge">0</span>
+            </div>
+            <div class="field">
+              <label>Ajouter un client à la tournée</label>
+              <select id="client-picker"></select>
+              <button id="add-stop" class="btn primary full">+ Ajouter l'arrêt</button>
+            </div>
+            <ul id="stop-list" class="stop-list"></ul>
+            <button id="optimize" class="btn full">⚡ Optimiser l'ordre (plus proche)</button>
+          </div>
+
+          <div class="card">
+            <h2>Paramètres de coût</h2>
+            <div class="grid2">
+              <div class="field">
+                <label>Prix carburant (€/L)</label>
+                <input id="fuel-price" type="number" step="0.01" value="1.85" />
+              </div>
+              <div class="field">
+                <label>Conso (L/100 km)</label>
+                <input id="consumption" type="number" step="0.1" value="7.5" />
+              </div>
+              <div class="field">
+                <label>Temps / arrêt (min)</label>
+                <input id="stop-time" type="number" step="1" value="15" />
+              </div>
+              <div class="field">
+                <label>Coût horaire (€/h)</label>
+                <input id="hourly-cost" type="number" step="1" value="0" />
+              </div>
+            </div>
+            <button id="calc" class="btn primary full">🧮 Calculer la tournée</button>
+          </div>
+        </aside>
+
+        <!-- Colonne centre : carte -->
+        <div class="map-wrap">
+          <div id="map"></div>
+        </div>
+
+        <!-- Colonne droite : résultats -->
+        <aside class="panel results">
+          <div class="card">
+            <h2>Résumé de la tournée</h2>
+            <div class="stats">
+              <div class="stat"><span class="stat-val" id="r-distance">—</span><span class="stat-lbl">Distance</span></div>
+              <div class="stat"><span class="stat-val" id="r-driving">—</span><span class="stat-lbl">Conduite</span></div>
+              <div class="stat"><span class="stat-val" id="r-total-time">—</span><span class="stat-lbl">Durée totale</span></div>
+              <div class="stat"><span class="stat-val" id="r-stops">—</span><span class="stat-lbl">Arrêts</span></div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-row"><span>Carburant</span><strong id="r-fuel">—</strong></div>
+              <div class="cost-row"><span>Litres consommés</span><strong id="r-liters">—</strong></div>
+              <div class="cost-row"><span>Main d'œuvre</span><strong id="r-labor">—</strong></div>
+              <div class="cost-row total"><span>Coût total estimé</span><strong id="r-total-cost">—</strong></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Feuille de route</h2>
+            <ol id="roadbook" class="roadbook"><li class="muted">Calculez la tournée pour voir le détail.</li></ol>
+            <button id="export-csv" class="btn full">⬇ Exporter (CSV)</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ VUE TERRAIN (mobile) ============ -->
+    <section id="view-field" class="view">
+      <div class="field-wrap">
+        <div class="field-top">
+          <select id="field-tour-select"><option value="">— Choisir une tournée —</option></select>
+          <div id="field-progress" class="field-progress"></div>
+        </div>
+        <div id="field-list" class="field-list">
+          <p class="empty-field">Sélectionnez une tournée enregistrée pour démarrer sur le terrain.</p>
+        </div>
+        <button id="field-reset" class="btn full" style="display:none">↺ Réinitialiser les statuts</button>
+      </div>
+    </section>
+
+    <!-- ============ VUE CRM ============ -->
+    <section id="view-crm" class="view">
+      <div class="crm-layout">
+        <div class="card">
+          <h2 id="crm-form-title">Nouveau client</h2>
+          <input type="hidden" id="c-id" />
+          <div class="grid2">
+            <div class="field"><label>Nom / Société *</label><input id="c-name" type="text" /></div>
+            <div class="field"><label>Contact</label><input id="c-contact" type="text" /></div>
+            <div class="field"><label>Téléphone</label><input id="c-phone" type="text" /></div>
+            <div class="field"><label>Email</label><input id="c-email" type="text" /></div>
+          </div>
+          <div class="field"><label>Adresse *</label>
+            <div class="inline">
+              <input id="c-address" type="text" placeholder="Adresse complète" />
+              <button id="c-geocode" class="btn small">📍 Localiser</button>
+            </div>
+            <small id="c-geo-status" class="muted"></small>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Type</label>
+              <select id="c-type"><option>Prospect</option><option>Client</option><option>Livraison</option><option>VIP</option></select>
+            </div>
+            <div class="field"><label>Priorité</label>
+              <select id="c-priority"><option>Normale</option><option>Haute</option><option>Basse</option></select>
+            </div>
+          </div>
+          <div class="field"><label>Notes</label><textarea id="c-notes" rows="2"></textarea></div>
+          <div class="inline">
+            <button id="c-save" class="btn primary">💾 Enregistrer</button>
+            <button id="c-reset" class="btn">Annuler</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Fichier clients</h2>
+            <input id="crm-search" class="search" type="text" placeholder="Rechercher…" />
+          </div>
+          <div class="table-wrap">
+            <table class="crm-table">
+              <thead><tr><th>Nom</th><th>Type</th><th>Ville / Adresse</th><th>Tél</th><th>Géo</th><th></th></tr></thead>
+              <tbody id="crm-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/crm.js"></script>
+  <script src="js/route.js"></script>
+  <script src="js/field.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

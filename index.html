@@ -2026,11 +2026,19 @@ const Cloud = (() => {
       alert('L\'URL du projet doit ressembler à https://xxxxxxxx.supabase.co\n(ne colle pas l\'adresse du tableau de bord supabase.com/dashboard/...).');
       return;
     }
-    if (!window.supabase) { alert('SDK Supabase non chargé (vérifie ta connexion internet).'); return; }
-    setCfg({ url, key });
-    sb = window.supabase.createClient(url, key);
+    if (!window.supabase || !window.supabase.createClient) {
+      alert('Le module Supabase n\'est pas chargé (connexion internet ou bloqueur de pub ?). Recharge la page.');
+      return;
+    }
+    try {
+      setCfg({ url, key });
+      sb = window.supabase.createClient(url, key);
+    } catch (e) {
+      alert('Erreur de connexion au projet : ' + (e.message || e));
+      return;
+    }
     show('auth');
-    msg('Projet connecté. Saisis ton email + mot de passe puis « Se connecter ».', true);
+    msg('Projet connecté ✓ Saisis ton email + mot de passe puis « Se connecter ».', true);
   }
 
   function forget() { clearCfg(); sb = null; user = null; show('config'); }

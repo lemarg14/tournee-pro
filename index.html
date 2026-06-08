@@ -2010,12 +2010,17 @@ const Cloud = (() => {
     const cfg = getCfg();
     if (!cfg || !window.supabase) { show('config'); return; }
     $('#sb-url').value = cfg.url; $('#sb-key').value = cfg.key;
+    // Un projet est déjà configuré → on affiche d'emblée l'écran de connexion
+    show('auth');
     try {
       sb = window.supabase.createClient(cfg.url, cfg.key);
-      const { data } = await sb.auth.getSession();
-      if (data.session) { user = data.session.user; enterSession(); await pull(true); }
-      else show('auth');
-    } catch (e) { show('config'); }
+      const { data, error } = await sb.auth.getSession();
+      if (!error && data && data.session) { user = data.session.user; enterSession(); await pull(true); }
+      else msg('Reconnecte-toi avec ton email et ton mot de passe.', true);
+    } catch (e) {
+      // session expirée / réseau : on reste sur l'écran de login, le projet reste connecté
+      msg('Session expirée — reconnecte-toi ci-dessous.');
+    }
   }
 
   function connect() {

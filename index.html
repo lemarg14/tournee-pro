@@ -1,0 +1,2735 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TournéePro — Planification de tournées commerciales & livraison</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+:root{
+  --bg:#2b2a27; --panel:#fffdf9; --ink:#2b2a27; --muted:#8a8578;
+  --line:#e9e3d6; --brand:#d97757; --brand-d:#c25e3f; --accent:#3f9b6b;
+  --warn:#e0922f; --soft:#f4f0e6; --radius:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink);background:var(--soft);font-size:14px}
+h1,h2{margin:0}
+.muted{color:var(--muted)}
+small.muted{font-size:11px;display:block;margin-top:4px}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg);color:#fff;padding:10px 20px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand h1{font-size:18px}
+.brand p{margin:0;font-size:11px;color:#cdbfa6}
+.logo{font-size:26px}
+.tabs{display:flex;gap:6px}
+.tab{background:transparent;border:1px solid #4a463d;color:#d8cdb8;
+  padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600}
+.tab.active{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* Views */
+.view{display:none;padding:16px}
+.view.active{display:block}
+
+/* Layout tournée */
+.layout{display:grid;grid-template-columns:320px 1fr 340px;gap:16px;
+  height:calc(100vh - 92px)}
+.panel{overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-right:4px}
+.map-wrap{border-radius:var(--radius);overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+#map{width:100%;height:100%}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);padding:14px}
+.card h2{font-size:14px;margin-bottom:10px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.card-head h2{margin:0}
+
+/* Fields */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:#6b6557}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(217,119,87,.18)}
+/* menus déroulants stylés (flèche custom) */
+select{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:32px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%237a869a' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 11px center;transition:border-color .15s,box-shadow .15s}
+select:hover{border-color:#d8cdb8}
+select[size]:not([size="1"]){background-image:none;padding-right:10px}
+select[size]:not([size="1"]) option{padding:6px 8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inline{display:flex;gap:6px}
+.inline input{flex:1}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.check input{width:auto}
+
+/* Buttons */
+.btn{background:#efe9dc;border:1px solid var(--line);color:var(--ink);
+  padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{background:#e6ddcb}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-d)}
+.btn.small{padding:8px 10px}
+.btn.full{width:100%;margin-top:8px}
+.badge{background:var(--brand);color:#fff;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700}
+
+/* Stop list */
+.stop-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.stop-list li{display:flex;align-items:center;gap:8px;background:var(--soft);
+  border:1px solid var(--line);border-radius:8px;padding:8px}
+.stop-list .num{background:var(--brand);color:#fff;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.stop-list .nm{flex:1;font-weight:600;font-size:13px}
+.stop-list .ord{display:flex;flex-direction:column}
+.stop-list .ord button{background:none;border:none;cursor:pointer;font-size:10px;line-height:1;color:var(--muted)}
+.stop-list .rm{background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px}
+
+/* Results */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{background:var(--soft);border-radius:8px;padding:10px;text-align:center}
+.stat-val{display:block;font-size:18px;font-weight:700;color:var(--brand)}
+.stat-lbl{font-size:11px;color:var(--muted)}
+.cost-box{border-top:1px solid var(--line);padding-top:10px}
+.cost-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+.cost-row.total{border-top:1px dashed var(--line);margin-top:6px;padding-top:8px;font-size:15px}
+.cost-row.total strong{color:var(--accent)}
+.roadbook{margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:6px}
+.roadbook li{padding:4px 0}
+.roadbook .leg{color:var(--muted);font-size:11px}
+
+/* CRM */
+.crm-layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+.search{width:200px}
+.table-wrap{overflow-x:auto;max-height:calc(100vh - 220px);overflow-y:auto}
+.crm-table{width:100%;border-collapse:collapse;font-size:13px}
+.crm-table th,.crm-table td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+.crm-table th{position:sticky;top:0;background:var(--panel);font-size:11px;text-transform:uppercase;color:var(--muted)}
+.crm-table tr:hover{background:var(--soft)}
+.pill{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+.pill.Client{background:#f3e2d9;color:#b25f3c}
+.pill.Prospect{background:#fef3c7;color:#b45309}
+.pill.Livraison{background:#d1fae5;color:#047857}
+.pill.VIP{background:#ede9fe;color:#6d28d9}
+.geo-ok{color:var(--accent);font-weight:700}
+.geo-no{color:#ef4444}
+.tbtn{background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px}
+.leaflet-marker-num{background:var(--brand);color:#fff;border-radius:50%;width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.leaflet-marker-depot{background:var(--accent)}
+
+/* ===== CRM enrichi ===== */
+.inline.wrap{flex-wrap:wrap}
+.subcard{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0}
+.subcard h3{font-size:13px;margin:0}
+.mini-list{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.mini-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;
+  background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.deal-add{display:grid;grid-template-columns:1.1fr .9fr 1.3fr auto;gap:6px}
+.deal-add input{font-size:12px;padding:7px}
+.overdue{color:#ef4444;font-weight:700}
+.crm-table td.overdue::before{color:#ef4444}
+/* pastilles statut prospection */
+.pill[class*="ps-"]{background:#efe9dc;color:#6b6557}
+.pill.ps-Gagne{background:#d1fae5;color:#047857}
+.pill.ps-Perdu{background:#fee2e2;color:#b91c1c}
+.pill.ps-RDV-pris{background:#f3e2d9;color:#b25f3c}
+.pill.ps-En-negociation{background:#fef3c7;color:#b45309}
+.pill.ps-Contacte{background:#efe6dd;color:#8a6b4f}
+
+/* ===== Produits (chips à cocher) ===== */
+.chips-pick{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);
+  border-radius:20px;padding:5px 11px;font-size:12px;cursor:pointer;font-weight:600;color:var(--muted)}
+.chip input{width:auto;margin:0}
+.chip.on{background:#fbe9e1;border-color:var(--brand);color:var(--brand-d)}
+.tagchip{display:inline-block;background:#fbe9e1;color:var(--brand-d);border-radius:6px;
+  padding:1px 7px;font-size:11px;font-weight:600;margin-right:3px}
+
+/* ===== Tableau interactif (inline + dépliable) ===== */
+.inline-sel{font-size:12px;padding:4px 22px 4px 8px;border-radius:6px;background-position:right 6px center;
+  min-width:108px;border-color:transparent;background-color:transparent;font-weight:600}
+.inline-sel:hover{border-color:var(--line);background-color:#fff}
+.namelink{background:none;border:none;padding:0;cursor:pointer;text-align:left;font:inherit;color:var(--ink);display:inline-flex;align-items:center}
+.namelink:hover strong{color:var(--brand);text-decoration:underline}
+.exp-cell{width:28px;padding-right:0!important;text-align:center}
+.exp-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px;border-radius:5px}
+.exp-btn:hover{background:var(--soft);color:var(--brand)}
+tr.row-open{background:var(--soft)}
+tr.detail>td{background:#fbf8f1;border-top:none}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;margin:6px 0 10px}
+.detail-grid .wide{grid-column:1/-1}
+.detail-grid .dk{display:block;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:.3px}
+.detail-grid>div{font-size:13px}
+@media(max-width:760px){.detail-grid{grid-template-columns:1fr 1fr}}
+
+/* ===== Recherche & filtres ===== */
+.search.full{width:100%;margin-bottom:8px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.filters select{flex:1;min-width:140px}
+.filters .ca-range{max-width:110px;flex:0 0 auto}
+
+/* ===== Bandeau Terrain (enjeu + jauge) ===== */
+.field-banner{background:linear-gradient(135deg,#d97757,#3f9b6b);color:#fff;border-radius:14px;
+  padding:14px 16px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.fb-enjeu{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.fb-enjeu-lbl{font-size:13px;font-weight:700;opacity:.95}
+.fb-enjeu-val{font-size:18px;font-weight:800}
+.fb-gauge-head{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:5px}
+.fb-rest{opacity:.9}
+.fb-gauge-bar{height:10px;background:rgba(255,255,255,.3);border-radius:6px;overflow:hidden}
+.fb-gauge-bar span{display:block;height:100%;width:0;background:#fff;border-radius:6px;transition:width .3s}
+
+/* ===== Pastilles priorité ===== */
+.prio-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.prio-Haute{background:#ef4444}
+.prio-Normale{background:#d99a3f}
+.prio-Basse{background:#9ca3af}
+
+/* ===== Enjeu CA tournée ===== */
+.enjeu-card{background:linear-gradient(135deg,#d97757,#3f9b6b);color:#fff;text-align:center;border:none}
+.enjeu-lbl{font-size:12px;font-weight:600;opacity:.95}
+.enjeu-val{font-size:30px;font-weight:800;margin:4px 0}
+.enjeu-sub{font-size:11px;opacity:.9}
+
+/* ===== VUE KPI ===== */
+#view-kpi{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.seg{display:flex;background:#efe9dc;border-radius:9px;padding:3px}
+.seg-btn{border:none;background:transparent;padding:7px 14px;border-radius:7px;cursor:pointer;
+  font-weight:700;font-size:13px;color:var(--muted)}
+.seg-btn.active{background:#fff;color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:8px}
+.kpi-card{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi-name{font-size:12px;color:var(--muted);font-weight:600}
+.kpi-real{font-size:26px;font-weight:800;color:var(--ink);margin:4px 0}
+.kpi-target{font-size:11px;color:var(--muted)}
+.kpi-bar{height:8px;background:#e3e8f1;border-radius:6px;margin:8px 0 4px;overflow:hidden}
+.kpi-bar span{display:block;height:100%;border-radius:6px}
+.kpi-bar span.ok{background:var(--accent)}
+.kpi-bar span.mid{background:var(--warn)}
+.kpi-bar span.low{background:#ef4444}
+.kpi-rate{font-size:13px;font-weight:700;text-align:right}
+.kpi-rate.ok{color:var(--accent)}
+.kpi-rate.mid{color:var(--warn)}
+.kpi-rate.low{color:#ef4444}
+.obj-table input{padding:6px;max-width:120px}
+@media(max-width:760px){.kpi-grid{grid-template-columns:1fr 1fr}}
+
+/* ===== VUE STOCK & COMMANDES ===== */
+#view-stock-inner{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.stock-table td{padding:5px 6px}
+.cell-in{padding:5px 6px;font-size:12px;max-width:80px;border-color:transparent;background:transparent;text-align:right}
+.cell-in.cell-name{text-align:left;max-width:160px;font-weight:600}
+.cell-in:hover,.cell-in:focus{border-color:var(--line);background:#fff}
+.stock-alert-row{background:#fdeee7}
+.stock-add{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.stock-add input{flex:1;min-width:90px;max-width:130px}
+.alert-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.alert-card{background:#fdeee7;border:1px solid #f3c5b0;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.alert-card strong{color:var(--brand-d)}
+.order-line{display:flex;gap:6px;margin:8px 0}
+.order-line select{flex:1}
+.order-line input{max-width:90px}
+@media(max-width:760px){.stock-add input{max-width:none}}
+
+.sb-debug{font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--muted);
+  background:#faf6ee;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:10px;
+  max-height:120px;overflow-y:auto}
+.sb-debug:empty{display:none}
+
+/* ===== VUE PARAMÈTRES ===== */
+#view-settings{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.settings-head h2{font-size:20px}
+.settings-head p{margin:4px 0 0;font-size:13px}
+
+/* ===== Compteur contacts ===== */
+.count-badge{display:inline-block;background:var(--brand);color:#fff;border-radius:20px;
+  padding:1px 9px;font-size:12px;font-weight:700;vertical-align:middle;margin-left:4px}
+
+/* ===== Tâches ===== */
+.task-add{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.task-add #task-text{flex:1;min-width:160px}
+.task-add #task-date{max-width:150px}
+.task-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.task-item{display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid var(--line);
+  border-radius:9px;padding:9px 11px}
+.task-item label{display:flex;align-items:center;gap:9px;flex:1;cursor:pointer;font-size:14px}
+.task-item label input{width:auto}
+.task-item.done span{text-decoration:line-through;color:var(--muted)}
+.task-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* ===== VUE AGENDA ===== */
+#view-agenda{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.stats4{grid-template-columns:repeat(4,1fr)}
+.bk{font-weight:700;font-size:13px;padding:8px 12px;border-radius:8px;margin:14px 0 6px;
+  display:flex;align-items:center;gap:8px}
+.bk-count{background:rgba(0,0,0,.12);border-radius:20px;padding:1px 9px;font-size:12px}
+.bk-late{background:#fee2e2;color:#b91c1c}
+.bk-week{background:#f3e2d9;color:#b25f3c}
+.bk-2w{background:#efe6dd;color:#8a6b4f}
+.bk-month{background:#f5f7fb;color:#6b6557}
+.bk-later{background:#f5f7fb;color:#7a869a}
+#agenda-table .crm-table{margin-bottom:4px}
+
+/* notes & commentaires terrain */
+.fc-note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:7px 10px;
+  font-size:12px;margin-bottom:8px;color:#92400e}
+.fc-comment{display:flex;gap:6px}
+.fc-comment .cmt-input{flex:1}
+.slot{display:inline-block;background:var(--brand);color:#fff;font-size:11px;font-weight:700;
+  padding:1px 7px;border-radius:6px;margin-right:4px}
+
+/* ===== VUE TERRAIN ===== */
+.field-modes{display:flex;gap:6px;width:100%}
+.fmode{flex:1;padding:10px;border:1px solid var(--line);background:#fff;border-radius:9px;
+  font-weight:700;cursor:pointer;font-size:14px;color:var(--ink)}
+.fmode.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.fctrl{display:flex;gap:8px;width:100%}
+.fctrl select,.fctrl input{flex:1}
+.fc-tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;height:fit-content}
+.fc-tag.prospect{background:#fef3c7;color:#b45309}
+.fc-tag.client{background:#f3e2d9;color:#b25f3c}
+.fc-relance{font-size:11px;color:var(--muted);margin-top:2px}
+.field-wrap{max-width:560px;margin:0 auto}
+.field-top{position:sticky;top:0;z-index:5;background:var(--soft);padding:6px 0 10px;
+  display:flex;flex-direction:column;gap:8px}
+#field-tour-select{flex:1;font-size:15px;padding:11px}
+.field-progress{font-weight:700;color:var(--brand);font-size:14px}
+.empty-field{color:var(--muted);text-align:center;padding:40px 10px}
+.field-list{display:flex;flex-direction:column;gap:12px}
+
+.field-card{background:#fff;border:1px solid var(--line);border-left:5px solid var(--brand);
+  border-radius:12px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.field-card.is-done{border-left-color:var(--accent);opacity:.92}
+.fc-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.fc-num{background:var(--brand);color:#fff;width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.is-done .fc-num{background:var(--accent)}
+.fc-id{flex:1;display:flex;flex-direction:column;gap:2px}
+.fc-id strong{font-size:16px}
+.fc-addr{font-size:13px;color:var(--muted)}
+.fc-phone{font-size:13px;color:var(--brand);text-decoration:none;margin-top:2px}
+.fc-badge{background:var(--accent);color:#fff;font-size:12px;font-weight:700;
+  padding:3px 9px;border-radius:20px;white-space:nowrap}
+
+.nav-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.nav-btn{text-align:center;padding:13px 0;border-radius:10px;font-weight:700;
+  text-decoration:none;color:#fff;font-size:15px}
+.nav-btn.waze{background:#33ccff}
+.nav-btn.apple{background:#0a84ff}
+.nav-btn.google{background:#34a853}
+.nav-btn:active{filter:brightness(.9)}
+
+.st-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.st-btn{padding:11px 4px;border-radius:9px;border:1px solid var(--line);background:#f5f7fb;
+  font-weight:600;font-size:13px;cursor:pointer;color:var(--ink)}
+.st-btn.active{color:#fff;border-color:transparent}
+.st-btn.st-ok.active{background:var(--accent)}
+.st-btn.st-info.active{background:var(--brand)}
+.st-btn.st-warn.active{background:var(--warn)}
+.st-btn.st-bad.active{background:#ef4444}
+
+@media(max-width:1100px){
+  .layout{grid-template-columns:1fr;height:auto}
+  #map{height:380px}
+  .crm-layout{grid-template-columns:1fr}
+}
+
+/* ===== MOBILE ===== */
+@media(max-width:680px){
+  body{font-size:15px}
+  .topbar{flex-direction:column;align-items:stretch;gap:10px;padding:12px}
+  .brand h1{font-size:17px}
+  .tabs{width:100%}
+  .tab{flex:1;text-align:center;padding:11px 4px;font-size:13px}
+  .view{padding:10px}
+  .grid2{grid-template-columns:1fr}
+  /* champs/boutons plus gros pour le tactile */
+  input,select,textarea{font-size:16px;padding:11px}
+  .btn{padding:12px 14px}
+  .crm-layout{gap:12px}
+  .search{width:100%}
+  /* tableau CRM lisible sur petit écran */
+  .crm-table thead{display:none}
+  .crm-table,.crm-table tbody,.crm-table tr,.crm-table td{display:block;width:100%}
+  .crm-table tr{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;padding:6px}
+  .crm-table td{border:none;padding:5px 8px}
+  .crm-table td::before{content:attr(data-label);font-weight:700;color:var(--muted);
+    font-size:11px;display:block;text-transform:uppercase}
+}
+
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🚚</span>
+      <div>
+        <h1>TournéePro</h1>
+        <p>Planification de tournées commerciales & livraison</p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-view="crm" data-stage="prospect">🎯 Prospection</button>
+      <button class="tab" data-view="crm" data-stage="client">👥 Clients</button>
+      <button class="tab" data-view="agenda">📅 Agenda</button>
+      <button class="tab" data-view="plan">🚚 Tournée</button>
+      <button class="tab" data-view="field">📍 Terrain</button>
+      <button class="tab" data-view="kpi">📊 KPI</button>
+      <button class="tab" data-view="stock">📦 Stock</button>
+      <button class="tab" data-view="settings">⚙️ Paramètres</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ VUE TOURNÉE ============ -->
+    <section id="view-plan" class="view">
+      <div class="layout">
+        <!-- Colonne gauche : paramètres + arrêts -->
+        <aside class="panel">
+          <div class="card">
+            <div class="card-head"><h2>Mes tournées</h2></div>
+            <div class="field">
+              <label>Charger une tournée enregistrée</label>
+              <div class="inline">
+                <select id="tour-load"><option value="">— Sélectionner —</option></select>
+                <button id="tour-delete" class="btn small" title="Supprimer">🗑️</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Nom de la tournée</label>
+              <input id="tour-name" type="text" placeholder="Ex : Tournée Paris Centre - Lundi" />
+            </div>
+            <label class="check">
+              <input type="checkbox" id="tour-recurring" />
+              Tournée récurrente (modèle réutilisable)
+            </label>
+            <button id="tour-save" class="btn primary full">💾 Enregistrer cette tournée</button>
+          </div>
+
+          <div class="card">
+            <h2>Point de départ</h2>
+            <div class="field">
+              <label>Adresse de départ (dépôt)</label>
+              <div class="inline">
+                <input id="depot-input" type="text" placeholder="Ex : 10 rue de la Paix, Paris" />
+                <button id="depot-set" class="btn small">📍</button>
+              </div>
+              <small id="depot-status" class="muted"></small>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="return-depot" checked />
+              Retour au dépôt en fin de tournée
+            </label>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>Arrêts de la tournée</h2>
+              <span id="stop-count" class="badge">0</span>
+            </div>
+            <div class="field">
+              <label>Ajouter un client à la tournée</label>
+              <input id="client-search" class="search full" type="text" placeholder="🔍 Rechercher un contact…" />
+              <select id="client-picker" size="1"></select>
+              <button id="add-stop" class="btn primary full">+ Ajouter l'arrêt</button>
+            </div>
+            <ul id="stop-list" class="stop-list"></ul>
+            <button id="optimize" class="btn full">⚡ Optimiser l'ordre (plus proche)</button>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2>Calcul de la tournée</h2></div>
+            <div class="field">
+              <label>Heure de départ (optionnel)</label>
+              <input id="depart-time" type="time" />
+            </div>
+            <button id="calc" class="btn primary full">🧮 Calculer la tournée</button>
+          </div>
+        </aside>
+
+        <!-- Colonne centre : carte -->
+        <div class="map-wrap">
+          <div id="map"></div>
+        </div>
+
+        <!-- Colonne droite : résultats -->
+        <aside class="panel results">
+          <div class="card enjeu-card">
+            <div class="enjeu-lbl">💪 Enjeu CA de la tournée</div>
+            <div class="enjeu-val" id="enjeu-pot">—</div>
+            <div class="enjeu-sub" id="enjeu-sub">potentiel à aller chercher</div>
+          </div>
+          <div class="card">
+            <h2>Résumé de la tournée</h2>
+            <div class="stats">
+              <div class="stat"><span class="stat-val" id="r-distance">—</span><span class="stat-lbl">Distance</span></div>
+              <div class="stat"><span class="stat-val" id="r-driving">—</span><span class="stat-lbl">Conduite</span></div>
+              <div class="stat"><span class="stat-val" id="r-total-time">—</span><span class="stat-lbl">Durée totale</span></div>
+              <div class="stat"><span class="stat-val" id="r-stops">—</span><span class="stat-lbl">Arrêts</span></div>
+            </div>
+            <div class="cost-box">
+              <div class="cost-row"><span>Carburant</span><strong id="r-fuel">—</strong></div>
+              <div class="cost-row"><span>Litres consommés</span><strong id="r-liters">—</strong></div>
+              <div class="cost-row"><span>Main d'œuvre</span><strong id="r-labor">—</strong></div>
+              <div class="cost-row total"><span>Coût total estimé</span><strong id="r-total-cost">—</strong></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Feuille de route</h2>
+            <ol id="roadbook" class="roadbook"><li class="muted">Calculez la tournée pour voir le détail.</li></ol>
+            <button id="export-csv" class="btn full">⬇ Exporter (CSV)</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ VUE TERRAIN (mobile) ============ -->
+    <section id="view-field" class="view">
+      <div class="field-wrap">
+        <div class="field-banner">
+          <div class="fb-enjeu">
+            <span class="fb-enjeu-lbl">💪 Enjeu CA</span>
+            <span class="fb-enjeu-val" id="field-enjeu">—</span>
+          </div>
+          <div class="fb-gauge">
+            <div class="fb-gauge-head"><span id="field-gauge-text">0 / 0 points</span><span id="field-gauge-rest" class="fb-rest"></span></div>
+            <div class="fb-gauge-bar"><span id="field-gauge-fill"></span></div>
+          </div>
+        </div>
+        <div class="field-top">
+          <div class="field-modes">
+            <button class="fmode active" data-mode="date">📅 À visiter</button>
+            <button class="fmode" data-mode="tour">🚚 Tournée</button>
+          </div>
+          <div id="fctrl-date" class="fctrl">
+            <input type="date" id="field-date" />
+            <select id="field-stage-filter">
+              <option value="all">Tous</option>
+              <option value="prospect">Prospects</option>
+              <option value="client">Clients</option>
+            </select>
+          </div>
+          <div id="fctrl-tour" class="fctrl" style="display:none">
+            <select id="field-tour-select"><option value="">— Choisir une tournée —</option></select>
+          </div>
+          <label class="check" style="font-size:13px"><input type="checkbox" id="field-hide-done" checked /> Masquer les points validés</label>
+        </div>
+        <div id="field-list" class="field-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ VUE CRM (Prospection / Clients) ============ -->
+    <section id="view-crm" class="view active">
+      <div class="crm-layout">
+        <div class="card">
+          <h2 id="crm-form-title">Nouveau prospect</h2>
+          <input type="hidden" id="c-id" />
+          <div class="grid2">
+            <div class="field"><label>Nom / Société *</label><input id="c-name" type="text" /></div>
+            <div class="field"><label>Contact</label><input id="c-contact" type="text" /></div>
+            <div class="field"><label>Téléphone</label><input id="c-phone" type="text" /></div>
+            <div class="field"><label>Email</label><input id="c-email" type="text" /></div>
+          </div>
+          <div class="field"><label>Adresse *</label>
+            <div class="inline">
+              <input id="c-address" type="text" placeholder="Adresse complète" />
+              <button id="c-geocode" class="btn small">📍 Localiser</button>
+            </div>
+            <small id="c-geo-status" class="muted"></small>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Type de commerce</label>
+              <select id="c-btype">
+                <option>Commerce</option><option>Restaurant</option><option>Hôtellerie</option>
+                <option>Garage</option><option>Salon de beauté</option><option>Salon de coiffure</option>
+                <option>Agence marketing</option><option>Artisan</option>
+                <option>Taxi/VTC</option><option>Freelance</option><option>Autre</option>
+              </select>
+            </div>
+            <div class="field" id="c-sub-wrap" style="display:none"><label>Sous-type</label>
+              <select id="c-bsub"><option>Hôtel</option><option>Airbnb</option><option>Gîte</option></select>
+            </div>
+            <div class="field"><label>Priorité</label>
+              <select id="c-priority"><option>Normale</option><option>Haute</option><option>Basse</option></select>
+            </div>
+            <div class="field" id="c-pstatus-wrap"><label>Statut prospection</label>
+              <select id="c-pstatus">
+                <option>À contacter</option><option>Contacté</option><option>RDV pris</option>
+                <option>En négociation</option><option>Gagné</option><option>Perdu</option>
+              </select>
+            </div>
+            <div class="field"><label>Relance auto (jours)</label>
+              <div class="inline">
+                <select id="c-relance">
+                  <option value="15">15 jours</option><option value="30" selected>30 jours</option>
+                  <option value="45">45 jours</option><option value="60">60 jours</option>
+                  <option value="90">90 jours</option><option value="custom">Personnalisé…</option>
+                </select>
+                <input id="c-relance-custom" type="number" min="1" placeholder="jours" style="display:none;max-width:90px" />
+              </div>
+            </div>
+            <div class="field"><label>CA potentiel estimé (€)</label>
+              <input id="c-potentiel" type="number" step="0.01" placeholder="Ex : 2000" />
+            </div>
+            <div class="field"><label>Date de relance (manuelle)</label>
+              <input id="c-relancedate" type="date" />
+              <small class="muted">Laissez vide = calcul auto (dernier passage + délai).</small>
+            </div>
+          </div>
+          <div class="field"><label>Produits d'intérêt</label>
+            <div id="c-products" class="chips-pick"></div>
+          </div>
+          <div class="field"><label>Notes</label><textarea id="c-notes" rows="2"></textarea></div>
+
+          <!-- Deals financiers -->
+          <div class="subcard">
+            <div class="card-head"><h3>💶 Deals réalisés <span id="deals-total" class="badge"></span></h3></div>
+            <div id="deals-list" class="mini-list"></div>
+            <div class="deal-add">
+              <input id="d-date" type="date" />
+              <input id="d-amount" type="number" placeholder="Montant €" step="0.01" />
+              <input id="d-label" type="text" placeholder="Objet (ex: contrat)" />
+              <button id="d-add" class="btn small">+</button>
+            </div>
+          </div>
+
+          <!-- Historique passages -->
+          <div class="subcard">
+            <div class="card-head"><h3>📍 Historique des passages</h3></div>
+            <div id="visits-list" class="mini-list"><span class="muted">Aucun passage enregistré.</span></div>
+            <small id="relance-info" class="muted"></small>
+          </div>
+
+          <div class="inline wrap">
+            <button id="c-save" class="btn primary">💾 Enregistrer</button>
+            <button id="c-convert" class="btn" style="display:none">⮕ Basculer en client</button>
+            <button id="c-reset" class="btn">Annuler</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 id="crm-list-title">Fichier prospects <span id="crm-count" class="count-badge">0</span></h2>
+            <input id="crm-search" class="search" type="text" placeholder="🔍 Rechercher…" />
+          </div>
+          <div class="filters">
+            <select id="f-priority"><option value="">Priorité : toutes</option><option>Haute</option><option>Normale</option><option>Basse</option></select>
+            <select id="f-btype"><option value="">Commerce : tous</option></select>
+            <select id="f-status"><option value="">Statut : tous</option></select>
+            <select id="f-product"><option value="">Produit : tous</option></select>
+            <select id="f-sort">
+              <option value="name">Tri : Nom (A→Z)</option>
+              <option value="ca-desc">CA ↓ (décroissant)</option>
+              <option value="ca-asc">CA ↑ (croissant)</option>
+              <option value="potentiel-desc">Potentiel ↓</option>
+              <option value="relance">Relance la + proche</option>
+            </select>
+            <input id="f-ca-min" type="number" class="ca-range" placeholder="CA min €" />
+            <input id="f-ca-max" type="number" class="ca-range" placeholder="CA max €" />
+            <button id="f-clear" class="btn small" title="Réinitialiser les filtres">✕ Filtres</button>
+          </div>
+          <div class="table-wrap">
+            <table class="crm-table">
+              <thead><tr>
+                <th></th><th>Nom</th><th>Commerce</th><th id="th-status">Statut</th>
+                <th>Produits</th><th>Relance</th><th>CA</th><th></th>
+              </tr></thead>
+              <tbody id="crm-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VUE AGENDA / CA ============ -->
+    <section id="view-agenda" class="view">
+      <!-- Dashboard CA -->
+      <div class="card">
+        <div class="card-head">
+          <h2>💰 Chiffre d'affaires</h2>
+          <div class="inline">
+            <input type="date" id="ca-from" /> <span class="muted" style="align-self:center">→</span> <input type="date" id="ca-to" />
+          </div>
+        </div>
+        <div class="stats stats4">
+          <div class="stat"><span class="stat-val" id="ca-contracted">—</span><span class="stat-lbl">CA contracté (période)</span></div>
+          <div class="stat"><span class="stat-val" id="ca-potential">—</span><span class="stat-lbl">CA potentiel (prospects)</span></div>
+          <div class="stat"><span class="stat-val" id="ca-total-contracted">—</span><span class="stat-lbl">CA contracté total</span></div>
+          <div class="stat"><span class="stat-val" id="ca-pipeline">—</span><span class="stat-lbl">Pipeline (contracté + potentiel)</span></div>
+        </div>
+      </div>
+
+      <!-- Relances à venir -->
+      <div class="card">
+        <div class="card-head">
+          <h2>🔔 Relances à venir</h2>
+          <select id="agenda-filter">
+            <option value="all">Tous</option><option value="prospect">Prospects</option><option value="client">Clients</option>
+          </select>
+        </div>
+        <div id="agenda-table" class="table-wrap"></div>
+      </div>
+
+      <!-- Tâches -->
+      <div class="card">
+        <div class="card-head"><h2>✅ Mes tâches</h2></div>
+        <div class="task-add">
+          <input id="task-text" type="text" placeholder="Nouvelle tâche (ex : rappeler M. Durand)" />
+          <input id="task-date" type="date" />
+          <button id="task-add" class="btn primary">+ Ajouter</button>
+        </div>
+        <ul id="task-list" class="task-list"></ul>
+      </div>
+    </section>
+
+    <!-- ============ VUE KPI ============ -->
+    <section id="view-kpi" class="view">
+      <div class="card">
+        <div class="card-head">
+          <h2>📊 Indicateurs de performance</h2>
+          <div class="seg" id="kpi-period">
+            <button class="seg-btn active" data-p="day">Jour</button>
+            <button class="seg-btn" data-p="week">Semaine</button>
+            <button class="seg-btn" data-p="month">Mois</button>
+          </div>
+        </div>
+        <p class="muted" id="kpi-range" style="font-size:12px"></p>
+        <div id="kpi-cards" class="kpi-grid"></div>
+      </div>
+    </section>
+
+    <!-- ============ VUE STOCK & COMMANDES ============ -->
+    <section id="view-stock" class="view">
+      <div id="view-stock-inner">
+        <!-- Alertes réappro -->
+        <div class="card">
+          <div class="card-head"><h2>🔔 Réapprovisionnement</h2></div>
+          <div id="stock-alerts"></div>
+        </div>
+
+        <!-- Inventaire -->
+        <div class="card">
+          <div class="card-head"><h2>📦 Inventaire</h2></div>
+          <p class="muted" style="font-size:12px">Modifiez directement les cellules. Prévision = ventes estimées par mois. Délai = jours d'approvisionnement.</p>
+          <div class="table-wrap">
+            <table class="crm-table stock-table">
+              <thead><tr>
+                <th>Produit</th><th>Stock</th><th>Seuil</th><th>Prév./mois</th><th>Délai (j)</th>
+                <th>Prix €</th><th>Jours restants</th><th>Rupture estimée</th><th>Commander avant</th><th></th>
+              </tr></thead>
+              <tbody id="stock-body"></tbody>
+            </table>
+          </div>
+          <div class="stock-add">
+            <input id="sa-name" type="text" placeholder="Nouveau produit" />
+            <input id="sa-qty" type="number" placeholder="Stock" />
+            <input id="sa-seuil" type="number" placeholder="Seuil" />
+            <input id="sa-forecast" type="number" placeholder="Prév./mois" />
+            <input id="sa-lead" type="number" placeholder="Délai (j)" />
+            <input id="sa-price" type="number" step="0.01" placeholder="Prix €" />
+            <button id="sa-add" class="btn primary">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- Commandes -->
+        <div class="card">
+          <div class="card-head"><h2>🧾 Nouvelle commande</h2></div>
+          <p class="muted" style="font-size:12px">Chaque commande enregistrée débite automatiquement le stock.</p>
+          <div class="grid2">
+            <div class="field"><label>Date</label><input id="o-date" type="date" /></div>
+            <div class="field"><label>Client (optionnel)</label><select id="o-contact"></select></div>
+          </div>
+          <div class="order-line">
+            <select id="o-product"></select>
+            <input id="o-qty" type="number" min="1" placeholder="Qté" />
+            <button id="o-addline" class="btn">+ Ligne</button>
+          </div>
+          <ul id="o-lines" class="mini-list"></ul>
+          <div class="field"><label>Note</label><input id="o-note" type="text" placeholder="Référence, remarque…" /></div>
+          <button id="o-save" class="btn primary">✅ Enregistrer la commande</button>
+        </div>
+
+        <!-- Historique commandes -->
+        <div class="card">
+          <div class="card-head"><h2>📋 Historique des commandes</h2></div>
+          <div id="orders-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VUE PARAMÈTRES ============ -->
+    <section id="view-settings" class="view">
+      <div class="settings-head">
+        <h2>⚙️ Paramètres</h2>
+        <p class="muted">Configuration de l'application : objectifs, statuts et valeurs par défaut.</p>
+      </div>
+
+      <!-- Objectifs -->
+      <div class="card">
+        <div class="card-head"><h2>🎯 Objectifs commerciaux</h2></div>
+        <p class="muted" style="font-size:12px">Définissez vos objectifs par période. Ils servent au calcul du taux d'accomplissement dans l'onglet KPI.</p>
+        <div class="table-wrap">
+          <table class="crm-table obj-table">
+            <thead><tr><th>Période</th><th>Points de contact</th><th>Ventes</th><th>CA (€)</th></tr></thead>
+            <tbody>
+              <tr><td>Jour</td>
+                <td><input type="number" id="obj-day-points" /></td>
+                <td><input type="number" id="obj-day-ventes" /></td>
+                <td><input type="number" id="obj-day-ca" /></td></tr>
+              <tr><td>Semaine</td>
+                <td><input type="number" id="obj-week-points" /></td>
+                <td><input type="number" id="obj-week-ventes" /></td>
+                <td><input type="number" id="obj-week-ca" /></td></tr>
+              <tr><td>Mois</td>
+                <td><input type="number" id="obj-month-points" /></td>
+                <td><input type="number" id="obj-month-ventes" /></td>
+                <td><input type="number" id="obj-month-ca" /></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <button id="obj-save" class="btn primary" style="margin-top:8px">💾 Enregistrer les objectifs</button>
+      </div>
+
+      <!-- Statuts personnalisables -->
+      <div class="card">
+        <div class="card-head"><h2>🏷️ Statuts personnalisés</h2></div>
+        <p class="muted" style="font-size:12px">Un statut par ligne. « Gagné » bascule automatiquement un prospect en client. Modifiez puis enregistrez.</p>
+        <div class="grid2">
+          <div class="field"><label>Statuts Prospection</label><textarea id="st-prospect" rows="7"></textarea></div>
+          <div class="field"><label>Statuts Terrain (clients)</label><textarea id="st-client" rows="7"></textarea></div>
+        </div>
+        <div class="inline">
+          <button id="st-save" class="btn primary">💾 Enregistrer les statuts</button>
+          <button id="st-reset" class="btn">Réinitialiser</button>
+        </div>
+      </div>
+
+      <!-- Valeurs de coût par défaut -->
+      <div class="card">
+        <div class="card-head"><h2>⛽ Coûts par défaut (tournée)</h2></div>
+        <p class="muted" style="font-size:12px">Valeurs pré-remplies à l'ouverture d'une nouvelle tournée.</p>
+        <div class="grid2">
+          <div class="field"><label>Prix carburant (€/L)</label><input id="set-fuel" type="number" step="0.01" /></div>
+          <div class="field"><label>Consommation (L/100 km)</label><input id="set-consumption" type="number" step="0.1" /></div>
+          <div class="field"><label>Temps / arrêt (min)</label><input id="set-stoptime" type="number" step="1" /></div>
+          <div class="field"><label>Coût horaire (€/h)</label><input id="set-hourly" type="number" step="1" /></div>
+        </div>
+        <button id="set-save" class="btn primary" style="margin-top:8px">💾 Enregistrer les valeurs par défaut</button>
+      </div>
+
+      <!-- Catalogue produits -->
+      <div class="card">
+        <div class="card-head"><h2>📦 Catalogue produits / services</h2></div>
+        <p class="muted" style="font-size:12px">Un produit par ligne. Ils s'affichent comme cases à cocher dans les fiches prospect/client.</p>
+        <div class="field"><textarea id="prod-list" rows="6"></textarea></div>
+        <button id="prod-save" class="btn primary">💾 Enregistrer le catalogue</button>
+      </div>
+
+      <!-- Sauvegarde fichier -->
+      <div class="card">
+        <div class="card-head"><h2>💾 Sauvegarde locale (fichier)</h2></div>
+        <p class="muted" style="font-size:12px">Exporte toutes tes données dans un fichier .json (à garder ou à transférer sur un autre appareil), ou restaure depuis un fichier.</p>
+        <div class="inline wrap">
+          <button id="data-export" class="btn primary">⬇ Exporter mes données</button>
+          <label class="btn" style="cursor:pointer">⬆ Importer un fichier
+            <input id="data-import" type="file" accept="application/json" style="display:none" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Compte cloud -->
+      <div class="card">
+        <div class="card-head"><h2>☁️ Compte cloud (multi-appareils) <span class="count-badge" style="background:var(--accent)">v9</span></h2></div>
+        <div id="sb-debug" class="sb-debug"></div>
+        <div id="cloud-config">
+          <p class="muted" style="font-size:12px">Connecte un projet Supabase (gratuit) pour synchroniser tes données entre PC, téléphone et iPad. Colle ton URL et ta clé « anon » (voir le guide fourni), une seule fois.</p>
+          <div class="grid2">
+            <div class="field"><label>URL du projet Supabase</label><input id="sb-url" type="text" placeholder="https://xxxx.supabase.co" /></div>
+            <div class="field"><label>Clé publique (anon)</label><input id="sb-key" type="text" placeholder="eyJ..." /></div>
+          </div>
+          <button id="sb-connect" class="btn primary">🔌 Connecter</button>
+        </div>
+
+        <div id="cloud-auth" style="display:none">
+          <div class="grid2">
+            <div class="field"><label>Email</label><input id="sb-email" type="email" placeholder="email@exemple.fr" /></div>
+            <div class="field"><label>Mot de passe</label><input id="sb-pass" type="password" placeholder="••••••••" /></div>
+          </div>
+          <div class="inline wrap">
+            <button id="sb-login" class="btn primary">Se connecter</button>
+            <button id="sb-signup" class="btn">Créer un compte</button>
+            <button id="sb-forget" class="btn">Changer de projet</button>
+          </div>
+          <small id="sb-msg" class="muted"></small>
+        </div>
+
+        <div id="cloud-session" style="display:none">
+          <p>Connecté en tant que <strong id="sb-user"></strong></p>
+          <div class="inline wrap">
+            <button id="sb-pull" class="btn primary">⬇ Charger depuis le cloud</button>
+            <button id="sb-push" class="btn">⬆ Envoyer vers le cloud</button>
+            <button id="sb-logout" class="btn">Se déconnecter</button>
+          </div>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="sb-auto" checked /> Synchro automatique à chaque modification</label>
+          <small id="sb-status" class="muted"></small>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+/* === js/store.js === */
+/* store.js — persistance locale (localStorage) + modèle de données
+ *
+ * Modèle "contact" (prospect OU client) :
+ * {
+ *   id, name, contact, phone, email, address, lat, lng, notes,
+ *   stage: 'prospect' | 'client',
+ *   businessType: 'Commerce'|'Restaurant'|'Hôtellerie'|'Garage'|'Salon de beauté'|'Autre',
+ *   businessSub: ''|'Airbnb'|'Gîte'|'Hôtel',     // si Hôtellerie
+ *   priority: 'Basse'|'Normale'|'Haute',
+ *   prospectStatus: 'À contacter'|'Contacté'|'RDV pris'|'En négociation'|'Gagné'|'Perdu',
+ *   relanceInterval: 15|30|45,                   // jours
+ *   deals:  [{ id, date, amount, label }],       // deals financiers réalisés
+ *   visits: [{ id, date, status, note }]         // historique des passages
+ * }
+ */
+const Store = (() => {
+  const KEY = 'tp_contacts';
+  const KEY_SETTINGS = 'tp_settings';
+  const KEY_TOURS = 'tp_tours';
+  const KEY_STATUSES = 'tp_statuses';
+  const KEY_OBJ = 'tp_objectives';
+  const KEY_PRODUCTS = 'tp_products';
+  const DEFAULT_PRODUCTS = ['Produit A', 'Produit B', 'Service maintenance', 'Abonnement'];
+
+  const DEFAULT_STATUSES = {
+    prospect: ['À contacter', 'À visiter', 'Contacté', 'RDV pris', 'En négociation', 'Gagné', 'Perdu'],
+    client: ['Livré', 'Vente', 'Visité', 'Absent']
+  };
+
+  const load = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
+  const saveHooks = [];
+  const KEY_STOCK = 'tp_stock';
+  const KEY_ORDERS = 'tp_orders';
+  const KEY_TASKS = 'tp_tasks';
+  const DATA_KEYS = ['tp_contacts', 'tp_tours', 'tp_settings', 'tp_statuses', 'tp_objectives', 'tp_products', 'tp_stock', 'tp_orders', 'tp_tasks'];
+  const save = (k, v) => {
+    localStorage.setItem(k, JSON.stringify(v));
+    if (DATA_KEYS.includes(k)) saveHooks.forEach(fn => { try { fn(); } catch {} });
+  };
+  function id() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  // ---- Chargement + migration depuis l'ancien format ----
+  let contacts = load(KEY, null);
+  if (contacts === null) {
+    const old = load('tp_clients', null); // migration v1
+    if (old) {
+      contacts = old.map(c => migrate(c));
+      save(KEY, contacts);
+    } else {
+      contacts = demo();
+      save(KEY, contacts);
+    }
+  }
+
+  function migrate(c) {
+    const isClient = ['Client', 'Livraison', 'VIP'].includes(c.type);
+    return {
+      id: c.id || id(), name: c.name, contact: c.contact || '', phone: c.phone || '',
+      email: c.email || '', address: c.address || '', lat: c.lat ?? null, lng: c.lng ?? null,
+      notes: c.notes || '', stage: isClient ? 'client' : 'prospect',
+      businessType: 'Commerce', businessSub: '', priority: c.priority || 'Normale',
+      prospectStatus: isClient ? 'Gagné' : 'À contacter', relanceInterval: 30,
+      potentiel: 0, products: [], deals: [], visits: []
+    };
+  }
+
+  function demo() {
+    const base = (o) => Object.assign({
+      id: id(), contact: '', phone: '', email: '', notes: '', businessSub: '',
+      priority: 'Normale', relanceInterval: 30, potentiel: 0, products: [], deals: [], visits: []
+    }, o);
+    return [
+      base({ name: 'Boulangerie Martin', address: '15 Rue de Rivoli, 75004 Paris', lat: 48.8558, lng: 2.3588, stage: 'client', businessType: 'Commerce', prospectStatus: 'Gagné', phone: '0142001122', deals: [{ id: id(), date: '2026-04-10', amount: 1200, label: 'Contrat annuel' }], visits: [{ id: id(), date: '2026-05-15', status: 'Livré', note: '' }] }),
+      base({ name: 'Restaurant Bellevue', address: '2 Place du Trocadéro, 75116 Paris', lat: 48.8629, lng: 2.2876, stage: 'client', businessType: 'Restaurant', prospectStatus: 'Gagné', priority: 'Haute', deals: [{ id: id(), date: '2026-03-22', amount: 3400, label: 'Équipement cuisine' }], visits: [{ id: id(), date: '2026-05-20', status: 'Visité', note: '' }], relanceInterval: 15 }),
+      base({ name: 'Hôtel des Voyageurs', address: '20 Boulevard Saint-Germain, 75005 Paris', lat: 48.8487, lng: 2.3536, stage: 'client', businessType: 'Hôtellerie', businessSub: 'Hôtel', prospectStatus: 'Gagné', visits: [{ id: id(), date: '2026-05-05', status: 'Livré', note: '' }] }),
+      base({ name: 'Café Le Central', address: '50 Avenue des Champs-Élysées, 75008 Paris', lat: 48.8708, lng: 2.3050, stage: 'prospect', businessType: 'Restaurant', prospectStatus: 'RDV pris', phone: '0143003344', potentiel: 2500, visits: [{ id: id(), date: '2026-05-18', status: 'RDV pris', note: 'Revoir le gérant' }], relanceInterval: 15 }),
+      base({ name: 'Épicerie Bio Nature', address: '10 Rue Mouffetard, 75005 Paris', lat: 48.8434, lng: 2.3499, stage: 'prospect', businessType: 'Commerce', prospectStatus: 'À contacter', potentiel: 800, notes: 'À relancer' }),
+      base({ name: 'Garage Auto Plus', address: '8 Rue de la Roquette, 75011 Paris', lat: 48.8551, lng: 2.3736, stage: 'prospect', businessType: 'Garage', prospectStatus: 'Contacté', potentiel: 1500, visits: [{ id: id(), date: '2026-05-10', status: 'Absent', note: '' }], relanceInterval: 45 })
+    ];
+  }
+
+  // ---- Calculs dérivés ----
+  function lastVisitDate(c) {
+    if (!c.visits?.length) return null;
+    return c.visits.map(v => v.date).sort().slice(-1)[0];
+  }
+  function firstVisitDate(c) {
+    if (!c.visits?.length) return null;
+    return c.visits.map(v => v.date).sort()[0];
+  }
+  function nextRelanceDate(c) {
+    if (c.relanceDate) return c.relanceDate;   // date fixée manuellement
+    const last = lastVisitDate(c);
+    if (!last) return null;
+    const d = new Date(last + 'T00:00:00');
+    d.setDate(d.getDate() + (c.relanceInterval || 30));
+    return d.toISOString().slice(0, 10);
+  }
+  function dealsTotal(c) { return (c.deals || []).reduce((s, d) => s + (+d.amount || 0), 0); }
+
+  return {
+    newId: id,
+    all: () => contacts,
+    byStage: (stage) => contacts.filter(c => c.stage === stage),
+    get: (cid) => contacts.find(c => c.id === cid),
+    upsert(c) {
+      if (c.id && contacts.find(x => x.id === c.id)) {
+        contacts[contacts.findIndex(x => x.id === c.id)] = c;
+      } else { c.id = c.id || id(); contacts.push(c); }
+      save(KEY, contacts); return c;
+    },
+    remove(cid) { contacts = contacts.filter(c => c.id !== cid); save(KEY, contacts); },
+
+    addDeal(cid, deal) { const c = this.get(cid); if (!c) return; c.deals = c.deals || []; deal.id = id(); c.deals.push(deal); save(KEY, contacts); },
+    removeDeal(cid, dealId) { const c = this.get(cid); if (!c) return; c.deals = (c.deals || []).filter(d => d.id !== dealId); save(KEY, contacts); },
+
+    addVisit(cid, visit) { const c = this.get(cid); if (!c) return; c.visits = c.visits || []; visit.id = id(); c.visits.push(visit); save(KEY, contacts); return c; },
+    removeVisit(cid, vId) { const c = this.get(cid); if (!c) return; c.visits = (c.visits || []).filter(v => v.id !== vId); save(KEY, contacts); },
+
+    // Upsert d'un passage par date (terrain) + mise à jour du statut prospection + relance auto
+    recordVisit(cid, date, status) {
+      const c = this.get(cid); if (!c) return;
+      c.visits = c.visits || [];
+      const v = c.visits.find(x => x.date === date);
+      if (v) v.status = status; else c.visits.push({ id: id(), date, status, note: '' });
+      // Sync statut prospection (selon la liste de statuts configurée)
+      const PSTATUS = this.getStatuses().prospect;
+      if (c.stage === 'prospect' && PSTATUS.includes(status)) c.prospectStatus = status;
+      if (status === 'Gagné') { c.stage = 'client'; c.prospectStatus = 'Gagné'; }
+      save(KEY, contacts); return c;
+    },
+    clearVisit(cid, date) {
+      const c = this.get(cid); if (!c) return;
+      c.visits = (c.visits || []).filter(v => v.date !== date); save(KEY, contacts);
+    },
+    // Commentaire terrain : enregistré sur le passage du jour ET ajouté aux notes de la fiche
+    addComment(cid, date, text) {
+      const c = this.get(cid); if (!c || !text) return;
+      c.visits = c.visits || [];
+      let v = c.visits.find(x => x.date === date);
+      if (!v) { v = { id: id(), date, status: '', note: '' }; c.visits.push(v); }
+      v.note = v.note ? v.note + ' | ' + text : text;
+      const line = `[${date}] ${text}`;
+      c.notes = c.notes ? c.notes + '\n' + line : line;
+      save(KEY, contacts); return c;
+    },
+    convertToClient(cid) { const c = this.get(cid); if (!c) return; c.stage = 'client'; c.prospectStatus = 'Gagné'; save(KEY, contacts); return c; },
+
+    lastVisitDate, firstVisitDate, nextRelanceDate, dealsTotal,
+
+    // ---- Statuts personnalisables ----
+    getStatuses: () => Object.assign({}, DEFAULT_STATUSES, load(KEY_STATUSES, {})),
+    saveStatuses: (s) => save(KEY_STATUSES, s),
+    resetStatuses() { localStorage.removeItem(KEY_STATUSES); },
+
+    // ---- Catalogue de produits ----
+    getProducts: () => load(KEY_PRODUCTS, DEFAULT_PRODUCTS),
+    saveProducts: (arr) => save(KEY_PRODUCTS, arr),
+
+    // ---- Stock (inventaire) ----
+    // item : { id, name, qty, seuil, leadTime (j), forecast (ventes/mois), price }
+    getStock: () => load(KEY_STOCK, []),
+    getStockItem(sid) { return load(KEY_STOCK, []).find(x => x.id === sid); },
+    saveStockItem(item) {
+      const list = load(KEY_STOCK, []);
+      if (item.id && list.find(x => x.id === item.id)) list[list.findIndex(x => x.id === item.id)] = item;
+      else { item.id = 's' + id(); list.push(item); }
+      save(KEY_STOCK, list); return item;
+    },
+    patchStock(sid, patch) {
+      const list = load(KEY_STOCK, []); const it = list.find(x => x.id === sid);
+      if (it) { Object.assign(it, patch); save(KEY_STOCK, list); }
+    },
+    removeStockItem(sid) { save(KEY_STOCK, load(KEY_STOCK, []).filter(x => x.id !== sid)); },
+
+    // ---- Commandes (débitent le stock) ----
+    // order : { id, date, contactId, lines:[{stockId, name, qty}], note }
+    getOrders: () => load(KEY_ORDERS, []),
+    addOrder(order) {
+      order.id = 'o' + id();
+      const orders = load(KEY_ORDERS, []); orders.push(order); save(KEY_ORDERS, orders);
+      // débite le stock
+      const stock = load(KEY_STOCK, []);
+      order.lines.forEach(l => { const it = stock.find(s => s.id === l.stockId); if (it) it.qty = (+it.qty || 0) - (+l.qty || 0); });
+      save(KEY_STOCK, stock);
+      return order;
+    },
+    removeOrder(oid) {
+      const orders = load(KEY_ORDERS, []);
+      const o = orders.find(x => x.id === oid); if (!o) return;
+      // recrédite le stock
+      const stock = load(KEY_STOCK, []);
+      o.lines.forEach(l => { const it = stock.find(s => s.id === l.stockId); if (it) it.qty = (+it.qty || 0) + (+l.qty || 0); });
+      save(KEY_STOCK, stock);
+      save(KEY_ORDERS, orders.filter(x => x.id !== oid));
+    },
+    // ---- Tâches (agenda) ----
+    getTasks: () => load(KEY_TASKS, []),
+    addTask(text, date) {
+      const tasks = load(KEY_TASKS, []);
+      tasks.push({ id: 'k' + id(), text, date: date || '', done: false });
+      save(KEY_TASKS, tasks);
+    },
+    toggleTask(tid) {
+      const tasks = load(KEY_TASKS, []); const t = tasks.find(x => x.id === tid);
+      if (t) { t.done = !t.done; save(KEY_TASKS, tasks); }
+    },
+    removeTask(tid) { save(KEY_TASKS, load(KEY_TASKS, []).filter(t => t.id !== tid)); },
+
+    // Restock (réception d'appro)
+    restock(sid, qty) {
+      const list = load(KEY_STOCK, []); const it = list.find(x => x.id === sid);
+      if (it) { it.qty = (+it.qty || 0) + (+qty || 0); save(KEY_STOCK, list); }
+    },
+    // Prévision : jours de stock restants, date de rupture, date limite de commande
+    stockForecast(item) {
+      const daily = (+item.forecast || 0) / 30;
+      const days = daily > 0 ? (+item.qty || 0) / daily : Infinity;
+      const today = new Date();
+      const rupture = isFinite(days) ? new Date(today.getTime() + days * 86400000) : null;
+      const reorderBy = rupture ? new Date(rupture.getTime() - (+item.leadTime || 0) * 86400000) : null;
+      const iso = d => d ? d.toISOString().slice(0, 10) : null;
+      const alert = (+item.qty || 0) <= (+item.seuil || 0) || (reorderBy && reorderBy <= today);
+      return { days: isFinite(days) ? Math.round(days) : null, rupture: iso(rupture), reorderBy: iso(reorderBy), alert };
+    },
+
+    // ---- Chiffre d'affaires ----
+    // CA contracté = deals réalisés dans la période [from, to]
+    contractedInRange(from, to) {
+      return contacts.reduce((s, c) => s + (c.deals || [])
+        .filter(d => (!from || d.date >= from) && (!to || d.date <= to))
+        .reduce((a, d) => a + (+d.amount || 0), 0), 0);
+    },
+    // CA potentiel = somme des potentiels des prospects encore ouverts (hors Perdu)
+    potentialTotal() {
+      return contacts.filter(c => c.stage === 'prospect' && c.prospectStatus !== 'Perdu')
+        .reduce((s, c) => s + (+c.potentiel || 0), 0);
+    },
+    // Statistiques d'activité sur une période [from, to]
+    // points = nb de passages ; ventes = nb de deals ; ca = somme des deals
+    statsInRange(from, to) {
+      const inRange = d => (!from || d >= from) && (!to || d <= to);
+      let points = 0, ventes = 0, ca = 0;
+      for (const c of contacts) {
+        (c.visits || []).forEach(v => { if (inRange(v.date)) points++; });
+        (c.deals || []).forEach(d => { if (inRange(d.date)) { ventes++; ca += (+d.amount || 0); } });
+      }
+      const conversion = points ? ventes / points : 0;
+      return { points, ventes, ca, conversion };
+    },
+    getObjectives: () => load(KEY_OBJ, { day: { points: 10, ventes: 2, ca: 1000 }, week: { points: 40, ventes: 8, ca: 5000 }, month: { points: 160, ventes: 30, ca: 20000 } }),
+    saveObjectives: (o) => save(KEY_OBJ, o),
+
+    // Liste des relances à venir, triée par date
+    upcomingRelances() {
+      return contacts
+        .map(c => ({ c, date: this.nextRelanceDate(c) }))
+        .filter(x => x.date)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
+    // ---- Paramètres ----
+    getSettings: () => load(KEY_SETTINGS, { fuel: 1.85, consumption: 7.5, stopTime: 15, hourly: 0 }),
+    saveSettings: (s) => save(KEY_SETTINGS, s),
+
+    // ---- Tournées enregistrées ----
+    getTours: () => load(KEY_TOURS, []),
+    getTour(tid) { return load(KEY_TOURS, []).find(t => t.id === tid); },
+    saveTour(tour) {
+      const tours = load(KEY_TOURS, []); tour.updatedAt = Date.now();
+      if (tour.id && tours.find(t => t.id === tour.id)) tours[tours.findIndex(t => t.id === tour.id)] = tour;
+      else { tour.id = 't' + id(); tours.push(tour); }
+      save(KEY_TOURS, tours); return tour;
+    },
+    removeTour(tid) { save(KEY_TOURS, load(KEY_TOURS, []).filter(t => t.id !== tid)); },
+
+    // ---- Export / Import / Synchro ----
+    // Toutes les données métier dans un seul objet (pour fichier ou cloud)
+    exportAll() {
+      return {
+        version: 1, exportedAt: new Date().toISOString(),
+        contacts: load(KEY, []),
+        tours: load(KEY_TOURS, []),
+        settings: load(KEY_SETTINGS, null),
+        statuses: load(KEY_STATUSES, null),
+        objectives: load(KEY_OBJ, null),
+        products: load(KEY_PRODUCTS, null),
+        stock: load(KEY_STOCK, null),
+        orders: load(KEY_ORDERS, null),
+        tasks: load(KEY_TASKS, null)
+      };
+    },
+    importAll(data) {
+      if (!data || typeof data !== 'object') throw new Error('Fichier invalide');
+      if (Array.isArray(data.contacts)) { contacts = data.contacts; save(KEY, contacts); }
+      if (Array.isArray(data.tours)) save(KEY_TOURS, data.tours);
+      if (data.settings) save(KEY_SETTINGS, data.settings);
+      if (data.statuses) save(KEY_STATUSES, data.statuses);
+      if (data.objectives) save(KEY_OBJ, data.objectives);
+      if (data.products) save(KEY_PRODUCTS, data.products);
+      if (data.stock) save(KEY_STOCK, data.stock);
+      if (data.orders) save(KEY_ORDERS, data.orders);
+      if (data.tasks) save(KEY_TASKS, data.tasks);
+    },
+    lastModified() { return load('tp_lastmod', 0); },
+    touch() { save('tp_lastmod', Date.now()); },
+    onSave(fn) { saveHooks.push(fn); }
+  };
+})();
+
+/* === js/geo.js === */
+/* geo.js — géocodage (Nominatim) + itinéraire routier réel (OSRM) */
+const Geo = (() => {
+  const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+  const OSRM = 'https://router.project-osrm.org/route/v1/driving';
+
+  // Adresse -> { lat, lng, label }
+  async function geocode(address) {
+    const url = `${NOMINATIM}?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+    if (!res.ok) throw new Error('Géocodage indisponible');
+    const data = await res.json();
+    if (!data.length) throw new Error('Adresse introuvable');
+    return { lat: +data[0].lat, lng: +data[0].lon, label: data[0].display_name };
+  }
+
+  // Liste de points [{lat,lng}] -> itinéraire routier réel via OSRM
+  // Retourne { distance (m), duration (s), geometry (GeoJSON), legs:[{distance,duration}] }
+  async function route(points) {
+    if (points.length < 2) throw new Error('Au moins 2 points requis');
+    const coords = points.map(p => `${p.lng},${p.lat}`).join(';');
+    const url = `${OSRM}/${coords}?overview=full&geometries=geojson&annotations=duration,distance`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Service de routage indisponible');
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes.length) throw new Error('Itinéraire introuvable');
+    const r = data.routes[0];
+    return {
+      distance: r.distance,
+      duration: r.duration,
+      geometry: r.geometry,
+      legs: r.legs.map(l => ({ distance: l.distance, duration: l.duration }))
+    };
+  }
+
+  // Distance à vol d'oiseau (Haversine, mètres) — utilisée pour l'optimisation
+  function haversine(a, b) {
+    const R = 6371000, toRad = x => x * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+    const s = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  // Optimisation simple : algorithme du plus proche voisin
+  function optimizeOrder(depot, stops) {
+    const remaining = [...stops];
+    const ordered = [];
+    let current = depot;
+    while (remaining.length) {
+      let bi = 0, bd = Infinity;
+      remaining.forEach((s, i) => {
+        const d = haversine(current, s);
+        if (d < bd) { bd = d; bi = i; }
+      });
+      current = remaining[bi];
+      ordered.push(remaining.splice(bi, 1)[0]);
+    }
+    return ordered;
+  }
+
+  return { geocode, route, haversine, optimizeOrder };
+})();
+
+/* === js/crm.js === */
+/* crm.js — CRM Prospection & Clients : formulaire enrichi, produits, deals,
+ * passages, tableau interactif (édition inline + lignes dépliables). */
+const CRM = (() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+  const frDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR') : '—';
+  const slug = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+  const BTYPES = ['Commerce', 'Restaurant', 'Hôtellerie', 'Garage', 'Salon de beauté', 'Salon de coiffure', 'Agence marketing', 'Artisan', 'Taxi/VTC', 'Freelance', 'Autre'];
+
+  let stage = 'prospect';
+  let currentId = '';
+  let draftDeals = [], draftVisits = [];
+  const expanded = new Set();   // ids des lignes dépliées
+
+  function setStage(s) {
+    stage = s;
+    $('#crm-form-title').textContent = currentId
+      ? (s === 'prospect' ? 'Modifier le prospect' : 'Modifier le client')
+      : (s === 'prospect' ? 'Nouveau prospect' : 'Nouveau client');
+    $('#crm-list-title').textContent = s === 'prospect' ? 'Fichier prospects' : 'Fichier clients';
+    $('#th-status').textContent = 'Statut';
+    $('#c-pstatus-wrap').style.display = s === 'prospect' ? '' : 'none';
+    populateFilters();
+    render();
+  }
+  const getStage = () => stage;
+  const getCurrentId = () => currentId;
+
+  function toggleSub() { $('#c-sub-wrap').style.display = $('#c-btype').value === 'Hôtellerie' ? '' : 'none'; }
+  function setRelance(days) {
+    const sel = $('#c-relance');
+    const preset = [...sel.options].some(o => o.value === String(days) && o.value !== 'custom');
+    if (preset) { sel.value = String(days); $('#c-relance-custom').style.display = 'none'; }
+    else { sel.value = 'custom'; const ci = $('#c-relance-custom'); ci.style.display = ''; ci.value = days; }
+  }
+  function toggleRelance() { $('#c-relance-custom').style.display = $('#c-relance').value === 'custom' ? '' : 'none'; }
+  function populateStatusOptions(selected) {
+    $('#c-pstatus').innerHTML = Store.getStatuses().prospect.map(s => `<option ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+  }
+
+  // --- Produits (cases à cocher depuis le catalogue) ---
+  function renderProductPicker(selected = []) {
+    const cat = Store.getProducts();
+    const all = [...new Set([...cat, ...selected])];
+    $('#c-products').innerHTML = all.length ? all.map(p =>
+      `<label class="chip ${selected.includes(p) ? 'on' : ''}"><input type="checkbox" value="${esc(p)}" ${selected.includes(p) ? 'checked' : ''}/> ${esc(p)}</label>`
+    ).join('') : '<span class="muted" style="font-size:12px">Aucun produit. Ajoutez-en dans Paramètres → Catalogue.</span>';
+  }
+  const readProducts = () => [...document.querySelectorAll('#c-products input:checked')].map(i => i.value);
+
+  function fields() {
+    const existing = currentId ? Store.get(currentId) : null;
+    return {
+      id: currentId || '',
+      name: $('#c-name').value.trim(), contact: $('#c-contact').value.trim(),
+      phone: $('#c-phone').value.trim(), email: $('#c-email').value.trim(),
+      address: $('#c-address').value.trim(),
+      lat: $('#c-id').dataset.lat ? +$('#c-id').dataset.lat : (existing?.lat ?? null),
+      lng: $('#c-id').dataset.lng ? +$('#c-id').dataset.lng : (existing?.lng ?? null),
+      stage: existing?.stage || stage,
+      businessType: $('#c-btype').value,
+      businessSub: $('#c-btype').value === 'Hôtellerie' ? $('#c-bsub').value : '',
+      priority: $('#c-priority').value,
+      prospectStatus: $('#c-pstatus').value,
+      relanceInterval: $('#c-relance').value === 'custom' ? (+$('#c-relance-custom').value || 30) : +$('#c-relance').value,
+      relanceDate: $('#c-relancedate').value || '',
+      potentiel: +$('#c-potentiel').value || 0,
+      products: readProducts(),
+      notes: $('#c-notes').value.trim(),
+      deals: existing ? existing.deals : draftDeals,
+      visits: existing ? existing.visits : draftVisits
+    };
+  }
+
+  function fill(c) {
+    currentId = c?.id || '';
+    draftDeals = []; draftVisits = [];
+    populateStatusOptions(c?.prospectStatus || Store.getStatuses().prospect[0]);
+    $('#c-id').dataset.lat = c?.lat ?? ''; $('#c-id').dataset.lng = c?.lng ?? '';
+    $('#c-name').value = c?.name || ''; $('#c-contact').value = c?.contact || '';
+    $('#c-phone').value = c?.phone || ''; $('#c-email').value = c?.email || '';
+    $('#c-address').value = c?.address || '';
+    $('#c-btype').value = c?.businessType || 'Commerce';
+    $('#c-bsub').value = c?.businessSub || 'Hôtel';
+    $('#c-priority').value = c?.priority || 'Normale';
+    $('#c-pstatus').value = c?.prospectStatus || 'À contacter';
+    setRelance(c?.relanceInterval || 30);
+    $('#c-relancedate').value = c?.relanceDate || '';
+    $('#c-potentiel').value = c?.potentiel || '';
+    renderProductPicker(c?.products || []);
+    $('#c-notes').value = c?.notes || '';
+    $('#c-geo-status').textContent = c?.lat ? `✓ Géolocalisé` : '';
+    $('#c-convert').style.display = (c && c.stage === 'prospect') ? '' : 'none';
+    toggleSub();
+    setStage(stage);
+    renderDeals(); renderVisits();
+  }
+
+  function renderDeals() {
+    const c = currentId ? Store.get(currentId) : null;
+    const deals = c ? c.deals : draftDeals;
+    const total = deals.reduce((s, d) => s + (+d.amount || 0), 0);
+    $('#deals-total').textContent = deals.length ? eur(total) : '';
+    $('#deals-list').innerHTML = deals.length ? deals.map(d => `
+      <div class="mini-row"><span>${frDate(d.date)} · <strong>${eur(d.amount)}</strong> ${esc(d.label || '')}</span>
+      <button class="tbtn" data-deal-del="${d.id}">🗑️</button></div>`).join('') : '<span class="muted">Aucun deal.</span>';
+  }
+  function renderVisits() {
+    const c = currentId ? Store.get(currentId) : null;
+    const visits = (c ? c.visits : draftVisits).slice().sort((a, b) => b.date.localeCompare(a.date));
+    $('#visits-list').innerHTML = visits.length ? visits.map(v => `
+      <div class="mini-row"><span>${frDate(v.date)} · <strong>${esc(v.status)}</strong> ${v.note ? '· ' + esc(v.note) : ''}</span>
+      <button class="tbtn" data-visit-del="${v.id}">🗑️</button></div>`).join('') : '<span class="muted">Aucun passage enregistré.</span>';
+    if (c) {
+      const nr = Store.nextRelanceDate(c);
+      $('#relance-info').textContent = nr
+        ? `Dernier passage : ${frDate(Store.lastVisitDate(c))} · Prochaine relance : ${frDate(nr)} (+${c.relanceInterval} j)`
+        : 'Aucun passage : la relance se calculera dès le 1er passage.';
+    } else $('#relance-info').textContent = '';
+  }
+
+  // --- Remplissage des menus de filtre ---
+  function populateFilters() {
+    const keep = (sel, html) => { const v = sel.value; sel.innerHTML = html; sel.value = v; };
+    keep($('#f-btype'), '<option value="">Commerce : tous</option>' + BTYPES.map(b => `<option>${b}</option>`).join(''));
+    keep($('#f-status'), '<option value="">Statut : tous</option>' + Store.getStatuses().prospect.map(s => `<option>${s}</option>`).join(''));
+    keep($('#f-product'), '<option value="">Produit : tous</option>' + Store.getProducts().map(p => `<option>${esc(p)}</option>`).join(''));
+  }
+
+  function render() {
+    const f = ($('#crm-search').value || '').toLowerCase();
+    const fPrio = $('#f-priority')?.value || '';
+    const fType = $('#f-btype')?.value || '';
+    const fStatus = $('#f-status')?.value || '';
+    const fProduct = $('#f-product')?.value || '';
+    const sort = $('#f-sort')?.value || 'name';
+    const caMin = $('#f-ca-min')?.value ? +$('#f-ca-min').value : null;
+    const caMax = $('#f-ca-max')?.value ? +$('#f-ca-max').value : null;
+    const prioOpts = ['Haute', 'Normale', 'Basse'];
+    const statusList = Store.getStatuses().prospect;
+
+    const list = Store.byStage(stage)
+      .filter(c => !f || (c.name + c.address + c.businessType + (c.prospectStatus || '') + (c.products || []).join(' ')).toLowerCase().includes(f))
+      .filter(c => !fPrio || (c.priority || 'Normale') === fPrio)
+      .filter(c => !fType || c.businessType === fType)
+      .filter(c => !fStatus || c.prospectStatus === fStatus)
+      .filter(c => !fProduct || (c.products || []).includes(fProduct))
+      .filter(c => {
+        const ca = Store.dealsTotal(c);
+        return (caMin == null || ca >= caMin) && (caMax == null || ca <= caMax);
+      })
+      .sort((a, b) => {
+        if (sort === 'ca-desc') return Store.dealsTotal(b) - Store.dealsTotal(a);
+        if (sort === 'ca-asc') return Store.dealsTotal(a) - Store.dealsTotal(b);
+        if (sort === 'potentiel-desc') return (+b.potentiel || 0) - (+a.potentiel || 0);
+        if (sort === 'relance') return (Store.nextRelanceDate(a) || '9999').localeCompare(Store.nextRelanceDate(b) || '9999');
+        return a.name.localeCompare(b.name);
+      });
+    const rows = list.map(c => mainRow(c, prioOpts, statusList) + (expanded.has(c.id) ? detailRow(c) : '')).join('');
+    $('#crm-body').innerHTML = rows ||
+      `<tr><td colspan="8" class="muted">Aucun ${stage === 'prospect' ? 'prospect' : 'client'}.</td></tr>`;
+    const total = Store.byStage(stage).length;
+    $('#crm-count').textContent = list.length === total ? `${total}` : `${list.length}/${total}`;
+  }
+
+  function mainRow(c, prioOpts, statusList) {
+    const biz = c.businessType + (c.businessSub ? ` (${c.businessSub})` : '');
+    const nr = Store.nextRelanceDate(c);
+    const overdue = nr && nr <= new Date().toISOString().slice(0, 10);
+    const open = expanded.has(c.id);
+    const prio = `<span class="prio-dot prio-${slug(c.priority || 'Normale')}" title="Priorité ${esc(c.priority || 'Normale')}"></span>`;
+    const statusSel = `<select class="inline-sel" data-inline="prospectStatus" data-cid="${c.id}">${
+      statusList.map(s => `<option ${s === c.prospectStatus ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
+    const prods = (c.products || []).slice(0, 2).map(p => `<span class="tagchip">${esc(p)}</span>`).join('')
+      + ((c.products || []).length > 2 ? ` <span class="muted">+${c.products.length - 2}</span>` : '');
+    const relTxt = nr ? frDate(nr) + (overdue ? ' ⚠️' : '') : '—';
+    return `<tr class="${open ? 'row-open' : ''}">
+      <td class="exp-cell"><button class="exp-btn" data-expand="${c.id}">${open ? '▾' : '▸'}</button></td>
+      <td data-label="Nom"><button class="namelink" data-expand="${c.id}">${prio}<strong>${esc(c.name)}</strong></button><br><small class="muted">${esc(c.contact || '')}</small></td>
+      <td data-label="Commerce">${esc(biz)}</td>
+      <td data-label="Statut">${statusSel}</td>
+      <td data-label="Produits">${prods || '<span class="muted">—</span>'}</td>
+      <td data-label="Relance" class="${overdue ? 'overdue' : ''}">${relTxt}</td>
+      <td data-label="CA">${eur(Store.dealsTotal(c))}</td>
+      <td style="white-space:nowrap">
+        <button class="tbtn" data-edit="${c.id}" title="Fiche complète">✏️</button>
+        <button class="tbtn" data-del="${c.id}" title="Supprimer">🗑️</button>
+      </td></tr>`;
+  }
+
+  function detailRow(c) {
+    const prods = (c.products || []).map(p => `<span class="tagchip">${esc(p)}</span>`).join(' ') || '—';
+    const lastV = Store.lastVisitDate(c);
+    return `<tr class="detail"><td></td><td colspan="7">
+      <div class="detail-grid">
+        <div><span class="dk">Contact</span>${esc(c.contact) || '—'}</div>
+        <div><span class="dk">Téléphone</span>${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : '—'}</div>
+        <div><span class="dk">Email</span>${esc(c.email) || '—'}</div>
+        <div><span class="dk">Adresse</span>${esc(c.address) || '—'}</div>
+        <div><span class="dk">CA contracté</span>${eur(Store.dealsTotal(c))}</div>
+        <div><span class="dk">CA potentiel</span>${eur(c.potentiel)}</div>
+        <div><span class="dk">Priorité</span>${esc(c.priority || 'Normale')}</div>
+        <div><span class="dk">Relance</span>tous les ${c.relanceInterval} j</div>
+        <div><span class="dk">Dernier passage</span>${lastV ? frDate(lastV) : '—'}</div>
+        <div><span class="dk">Nb passages</span>${(c.visits || []).length}</div>
+        <div class="wide"><span class="dk">Produits d'intérêt</span>${prods}</div>
+        <div class="wide"><span class="dk">Notes</span>${esc(c.notes) || '—'}</div>
+      </div>
+      <button class="btn small" data-edit="${c.id}">✏️ Modifier la fiche complète</button>
+    </td></tr>`;
+  }
+
+  function toggleExpand(id) { expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(); }
+
+  function addDraftDeal(d) { d.id = Store.newId(); draftDeals.push(d); renderDeals(); }
+  function rmDraftDeal(id) { draftDeals = draftDeals.filter(x => x.id !== id); renderDeals(); }
+  function rmDraftVisit(id) { draftVisits = draftVisits.filter(x => x.id !== id); renderVisits(); }
+
+  return {
+    setStage, getStage, getCurrentId, fields, fill, render, renderDeals, renderVisits,
+    toggleSub, toggleRelance, toggleExpand, populateFilters,
+    addDraftDeal, rmDraftDeal, rmDraftVisit
+  };
+})();
+
+/* === js/route.js === */
+/* route.js — moteur de calcul : heures, km et coût (carburant + main d'œuvre) */
+const RouteCalc = (() => {
+
+  // Calcule l'ensemble des indicateurs d'une tournée.
+  // routeData : résultat de Geo.route (distance m, duration s, legs[])
+  // settings : { fuel €/L, consumption L/100km, stopTime min, hourly €/h }
+  // nbStops : nombre d'arrêts clients
+  function compute(routeData, settings, nbStops) {
+    const km = routeData.distance / 1000;
+    const drivingMin = routeData.duration / 60;
+    const serviceMin = nbStops * settings.stopTime;
+    const totalMin = drivingMin + serviceMin;
+
+    const liters = km * (settings.consumption / 100);
+    const fuelCost = liters * settings.fuel;
+    const laborCost = (totalMin / 60) * settings.hourly;
+    const totalCost = fuelCost + laborCost;
+
+    return {
+      km,
+      drivingMin,
+      serviceMin,
+      totalMin,
+      liters,
+      fuelCost,
+      laborCost,
+      totalCost
+    };
+  }
+
+  // Formatage
+  const fmtKm = m => (m / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' km';
+  const fmtKmN = km => km.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' km';
+  const fmtEur = v => v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const fmtL = v => v.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' L';
+
+  function fmtDuration(min) {
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
+  }
+
+  // "HH:MM" -> minutes depuis minuit (ou null)
+  function parseClock(hhmm) {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  }
+  // minutes depuis minuit -> "9h05"
+  function fmtClock(totalMin) {
+    if (totalMin == null || isNaN(totalMin)) return '';
+    const m = ((Math.round(totalMin) % 1440) + 1440) % 1440;
+    return `${Math.floor(m / 60)}h${(m % 60).toString().padStart(2, '0')}`;
+  }
+
+  return { compute, fmtKm, fmtKmN, fmtEur, fmtL, fmtDuration, parseClock, fmtClock };
+})();
+
+/* === js/field.js === */
+/* field.js — interface terrain (mobile) : par date OU par tournée
+ * Navigation GPS directe + statut par arrêt synchronisé avec le CRM. */
+const Field = (() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const frDate = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR');
+
+  // Couleur d'un statut selon mot-clé
+  function statusCls(key) {
+    if (/gagné|vente|livré|signé/i.test(key)) return 'st-ok';
+    if (/perdu|refus/i.test(key)) return 'st-bad';
+    if (/absent/i.test(key)) return 'st-warn';
+    return 'st-info';
+  }
+  // Liste de statuts contextuelle (depuis la config)
+  function statusSet(c) {
+    return Store.getStatuses()[c.stage === 'client' ? 'client' : 'prospect'];
+  }
+
+  let mode = 'date';
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  function navLinks(c) {
+    const hasGeo = c.lat != null && c.lng != null;
+    const q = hasGeo ? `${c.lat},${c.lng}` : encodeURIComponent(c.address || c.name);
+    const addr = encodeURIComponent(c.address || c.name);
+    return {
+      waze: hasGeo ? `https://waze.com/ul?ll=${c.lat},${c.lng}&navigate=yes` : `https://waze.com/ul?q=${addr}&navigate=yes`,
+      apple: `https://maps.apple.com/?daddr=${q}&dirflg=d`,
+      google: `https://www.google.com/maps/dir/?api=1&destination=${q}`
+    };
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.querySelectorAll('.fmode').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    $('#fctrl-date').style.display = m === 'date' ? '' : 'none';
+    $('#fctrl-tour').style.display = m === 'tour' ? '' : 'none';
+    render();
+  }
+
+  function refreshTourSelect() {
+    const sel = $('#field-tour-select');
+    const cur = sel.value;
+    const tours = Store.getTours().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    sel.innerHTML = '<option value="">— Choisir une tournée —</option>' +
+      tours.map(t => `<option value="${t.id}">${esc(t.name)}${t.recurring ? ' ♻︎' : ''}</option>`).join('');
+    if (cur) sel.value = cur;
+  }
+
+  // Liste des contacts à visiter pour une date donnée
+  function dueContacts(date, stageFilter) {
+    return Store.all().filter(c => {
+      if (stageFilter !== 'all' && c.stage !== stageFilter) return false;
+      const nr = Store.nextRelanceDate(c);
+      const noVisit = !c.visits || !c.visits.length;
+      // dû si relance <= date sélectionnée, ou jamais visité (à faire)
+      return (nr && nr <= date) || noVisit;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function cardHTML(c, i, visitDate) {
+    const nav = navLinks(c);
+    const visit = (c.visits || []).find(v => v.date === visitDate);
+    const status = visit?.status;
+    const biz = c.businessType + (c.businessSub ? ` (${c.businessSub})` : '');
+    const nr = Store.nextRelanceDate(c);
+    const btns = statusSet(c).map(k =>
+      `<button class="st-btn ${statusCls(k)} ${status === k ? 'active' : ''}" data-status="${esc(k)}" data-cid="${c.id}">${esc(k)}</button>`).join('');
+    return `<div class="field-card ${status ? 'is-done' : ''}">
+      <div class="fc-head">
+        <span class="fc-num">${i + 1}</span>
+        <div class="fc-id">
+          <strong>${esc(c.name)}</strong>
+          <span class="fc-addr">${esc(biz)} · ${esc(c.address || '')}</span>
+          ${c.phone ? `<a class="fc-phone" href="tel:${esc(c.phone)}">📞 ${esc(c.phone)}</a>` : ''}
+          ${nr ? `<span class="fc-relance">↻ relance prévue ${frDate(nr)}</span>` : ''}
+        </div>
+        <span class="fc-tag ${c.stage}">${c.stage === 'client' ? 'Client' : 'Prospect'}</span>
+      </div>
+      <div class="nav-btns">
+        <a class="nav-btn waze" href="${nav.waze}" target="_blank" rel="noopener">Waze</a>
+        <a class="nav-btn apple" href="${nav.apple}" target="_blank" rel="noopener">Plans</a>
+        <a class="nav-btn google" href="${nav.google}" target="_blank" rel="noopener">Maps</a>
+      </div>
+      <div class="st-btns">${btns}</div>
+      ${visit?.note ? `<div class="fc-note">📝 ${esc(visit.note)}</div>` : ''}
+      <div class="fc-comment">
+        <input type="text" class="cmt-input" data-cid="${c.id}" placeholder="Ajouter un commentaire…" />
+        <button class="btn small cmt-add" data-cid="${c.id}">💬</button>
+      </div>
+    </div>`;
+  }
+
+  const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+
+  function updateBanner(all, date) {
+    const done = all.filter(c => (c.visits || []).some(v => v.date === date)).length;
+    const total = all.length, rest = total - done;
+    const rate = total ? done / total * 100 : 0;
+    $('#field-gauge-text').textContent = `${done} / ${total} points validés`;
+    $('#field-gauge-rest').textContent = total ? `${rest} restant${rest > 1 ? 's' : ''}` : '';
+    $('#field-gauge-fill').style.width = rate + '%';
+    const pot = all.reduce((s, c) => s + (c.stage === 'prospect' ? (+c.potentiel || 0) : 0), 0);
+    const contracted = all.reduce((s, c) => s + Store.dealsTotal(c), 0);
+    $('#field-enjeu').textContent = total ? `${eur(pot)} pot. · ${eur(contracted)} contr.` : '—';
+  }
+
+  function render() {
+    const list = $('#field-list');
+    const hideDone = $('#field-hide-done').checked;
+    let all, date;
+    if (mode === 'date') {
+      date = $('#field-date').value || today();
+      all = dueContacts(date, $('#field-stage-filter').value);
+    } else {
+      const t = Store.getTour($('#field-tour-select').value);
+      date = today();
+      if (!t) {
+        list.innerHTML = '<p class="empty-field">Sélectionnez une tournée enregistrée.</p>';
+        updateBanner([], date); list.dataset.date = date; return;
+      }
+      all = t.stopIds.map(id => Store.get(id)).filter(Boolean);
+    }
+    list.dataset.date = date;
+    updateBanner(all, date);
+    const isDone = c => (c.visits || []).some(v => v.date === date);
+    const shown = hideDone ? all.filter(c => !isDone(c)) : all;
+    if (!all.length) {
+      list.innerHTML = mode === 'date'
+        ? '<p class="empty-field">Aucun point à visiter pour cette date 🎉</p>'
+        : '<p class="empty-field">Cette tournée ne contient aucun arrêt.</p>';
+    } else if (!shown.length) {
+      list.innerHTML = '<p class="empty-field">✅ Tous les points sont validés ! Décochez « Masquer » pour les revoir.</p>';
+    } else {
+      list.innerHTML = shown.map((c, i) => cardHTML(c, i, date)).join('');
+    }
+  }
+
+  // Clic sur un bouton de statut → enregistre/annule le passage à la date courante
+  function handleStatusClick(cid, status) {
+    const date = $('#field-list').dataset.date || today();
+    const c = Store.get(cid);
+    const existing = (c.visits || []).find(v => v.date === date);
+    if (existing && existing.status === status) Store.clearVisit(cid, date); // re-clic = annule
+    else Store.recordVisit(cid, date, status);
+    render();
+  }
+
+  // Commentaire terrain → synchronisé dans la fiche (notes + passage du jour)
+  function handleComment(cid, text) {
+    if (!text.trim()) return;
+    const date = $('#field-list').dataset.date || today();
+    Store.addComment(cid, date, text.trim());
+    render();
+  }
+
+  return { setMode, render, refreshTourSelect, handleStatusClick, handleComment };
+})();
+
+/* === js/agenda.js === */
+/* agenda.js — dashboard CA + tableau des relances à venir */
+const Agenda = (() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+  const frDate = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' });
+  const slug = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+
+  function bucket(date, today) {
+    if (date < today) return { k: 0, label: '⚠️ En retard', cls: 'bk-late' };
+    const d = (new Date(date) - new Date(today)) / 86400000;
+    if (d <= 7) return { k: 1, label: 'Cette semaine', cls: 'bk-week' };
+    if (d <= 14) return { k: 2, label: 'Sous 2 semaines', cls: 'bk-2w' };
+    if (d <= 31) return { k: 3, label: 'Ce mois-ci', cls: 'bk-month' };
+    return { k: 4, label: 'Plus tard', cls: 'bk-later' };
+  }
+
+  function renderDashboard() {
+    const from = $('#ca-from').value, to = $('#ca-to').value;
+    $('#ca-contracted').textContent = eur(Store.contractedInRange(from, to));
+    const pot = Store.potentialTotal();
+    const totalContracted = Store.contractedInRange('', '');
+    $('#ca-potential').textContent = eur(pot);
+    $('#ca-total-contracted').textContent = eur(totalContracted);
+    $('#ca-pipeline').textContent = eur(totalContracted + pot);
+  }
+
+  function renderRelances() {
+    const filter = $('#agenda-filter').value;
+    const today = new Date().toISOString().slice(0, 10);
+    let items = Store.upcomingRelances();
+    if (filter !== 'all') items = items.filter(x => x.c.stage === filter);
+
+    // groupement par période
+    const groups = {};
+    items.forEach(x => {
+      const b = bucket(x.date, today);
+      (groups[b.k] = groups[b.k] || { b, rows: [] }).rows.push(x);
+    });
+
+    const order = Object.values(groups).sort((a, b) => a.b.k - b.b.k);
+    const html = order.map(g => `
+      <div class="bk ${g.b.cls}">${g.b.label} <span class="bk-count">${g.rows.length}</span></div>
+      <table class="crm-table"><tbody>
+        ${g.rows.map(({ c, date }) => {
+          const biz = c.businessType + (c.businessSub ? ` (${c.businessSub})` : '');
+          const st = c.stage === 'prospect'
+            ? `<span class="pill ps-${slug(c.prospectStatus)}">${esc(c.prospectStatus)}</span>`
+            : `<span class="fc-tag client">Client</span>`;
+          return `<tr>
+            <td data-label="Relance"><strong>${frDate(date)}</strong></td>
+            <td data-label="Nom">${esc(c.name)}<br><small class="muted">${esc(biz)}</small></td>
+            <td data-label="Statut">${st}</td>
+            <td data-label="Tél">${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''}</td>
+            <td data-label="CA">${eur(Store.dealsTotal(c))}${c.potentiel ? ` <small class="muted">/ ${eur(c.potentiel)} pot.</small>` : ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody></table>`).join('');
+    $('#agenda-table').innerHTML = items.length ? html
+      : '<p class="muted">Aucune relance programmée (les relances apparaissent dès le 1er passage enregistré).</p>';
+  }
+
+  function renderTasks() {
+    const today = new Date().toISOString().slice(0, 10);
+    const tasks = Store.getTasks().slice().sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return (a.date || '9999').localeCompare(b.date || '9999');
+    });
+    $('#task-list').innerHTML = tasks.length ? tasks.map(t => {
+      const late = t.date && !t.done && t.date < today;
+      return `<li class="task-item ${t.done ? 'done' : ''}">
+        <label><input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}/> <span>${esc(t.text)}</span></label>
+        <span class="task-meta ${late ? 'overdue' : ''}">${t.date ? frDate(t.date) : ''}</span>
+        <button class="tbtn" data-taskdel="${t.id}">🗑️</button>
+      </li>`;
+    }).join('') : '<li class="muted">Aucune tâche.</li>';
+  }
+
+  function render() { renderDashboard(); renderRelances(); renderTasks(); }
+
+  function loadStatusEditors() {
+    const s = Store.getStatuses();
+    $('#st-prospect').value = s.prospect.join('\n');
+    $('#st-client').value = s.client.join('\n');
+  }
+
+  return { render, renderDashboard, renderRelances, renderTasks, loadStatusEditors };
+})();
+
+/* === js/kpi.js === */
+/* kpi.js — tableau de bord KPI : objectif / réalisé / taux d'accomplissement */
+const KPI = (() => {
+  const $ = s => document.querySelector(s);
+  const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+  const pct = v => Math.round(v * 100) + ' %';
+
+  let period = 'day';
+
+  // Bornes [from, to] de la période courante
+  function range(p) {
+    const now = new Date();
+    const iso = d => d.toISOString().slice(0, 10);
+    if (p === 'day') return [iso(now), iso(now)];
+    if (p === 'week') {
+      const d = new Date(now); const day = (d.getDay() + 6) % 7; // lundi=0
+      const mon = new Date(d); mon.setDate(d.getDate() - day);
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return [iso(mon), iso(sun)];
+    }
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return [iso(first), iso(last)];
+  }
+  const labelOf = p => ({ day: 'aujourd\'hui', week: 'cette semaine', month: 'ce mois-ci' }[p]);
+
+  function setPeriod(p) {
+    period = p;
+    document.querySelectorAll('#kpi-period .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.p === p));
+    render();
+  }
+
+  function gauge(label, real, target, fmt) {
+    const rate = target > 0 ? real / target : 0;
+    const clamped = Math.min(rate, 1) * 100;
+    const cls = rate >= 1 ? 'ok' : rate >= 0.6 ? 'mid' : 'low';
+    return `<div class="kpi-card">
+      <div class="kpi-name">${label}</div>
+      <div class="kpi-real">${fmt(real)}</div>
+      <div class="kpi-target">Objectif : ${fmt(target)}</div>
+      <div class="kpi-bar"><span class="${cls}" style="width:${clamped}%"></span></div>
+      <div class="kpi-rate ${cls}">${pct(rate)}</div>
+    </div>`;
+  }
+
+  function render() {
+    const [from, to] = range(period);
+    const s = Store.statsInRange(from, to);
+    const obj = Store.getObjectives()[period] || { points: 0, ventes: 0, ca: 0 };
+    const frDate = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR');
+    $('#kpi-range').textContent = `Période (${labelOf(period)}) : ${frDate(from)} → ${frDate(to)}`;
+    $('#kpi-cards').innerHTML =
+      gauge('Points de contact', s.points, obj.points, v => v) +
+      gauge('Chiffre d\'affaires', s.ca, obj.ca, eur) +
+      gauge('Ventes', s.ventes, obj.ventes, v => v) +
+      `<div class="kpi-card">
+        <div class="kpi-name">Taux de conversion</div>
+        <div class="kpi-real">${pct(s.conversion)}</div>
+        <div class="kpi-target">${s.ventes} vente(s) / ${s.points} passage(s)</div>
+        <div class="kpi-bar"><span class="${s.conversion >= 0.3 ? 'ok' : s.conversion >= 0.15 ? 'mid' : 'low'}" style="width:${Math.min(s.conversion, 1) * 100}%"></span></div>
+        <div class="kpi-rate">&nbsp;</div>
+      </div>`;
+  }
+
+  function loadObjectives() {
+    const o = Store.getObjectives();
+    ['day', 'week', 'month'].forEach(p => {
+      $('#obj-' + p + '-points').value = o[p].points;
+      $('#obj-' + p + '-ventes').value = o[p].ventes;
+      $('#obj-' + p + '-ca').value = o[p].ca;
+    });
+  }
+
+  function saveObjectives() {
+    const get = (p, k) => +$('#obj-' + p + '-' + k).value || 0;
+    const o = {};
+    ['day', 'week', 'month'].forEach(p => o[p] = { points: get(p, 'points'), ventes: get(p, 'ventes'), ca: get(p, 'ca') });
+    Store.saveObjectives(o);
+    render();
+  }
+
+  return { setPeriod, render, loadObjectives, saveObjectives };
+})();
+
+/* === js/stock.js === */
+/* stock.js — inventaire, commandes (débit auto), prévisions & alertes réappro */
+const Stock = (() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' €';
+  const frDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR') : '—';
+  let draftLines = [];   // lignes de la commande en cours
+
+  /* ---- Inventaire ---- */
+  function renderInventory() {
+    const items = Store.getStock();
+    $('#stock-body').innerHTML = items.length ? items.map(it => {
+      const fc = Store.stockForecast(it);
+      const low = (+it.qty || 0) <= (+it.seuil || 0);
+      const cell = (k, v, step) => `<input class="cell-in" data-sid="${it.id}" data-k="${k}" type="number" ${step ? 'step="' + step + '"' : ''} value="${v ?? ''}" />`;
+      return `<tr class="${fc.alert ? 'stock-alert-row' : ''}">
+        <td><input class="cell-in cell-name" data-sid="${it.id}" data-k="name" value="${esc(it.name)}" /></td>
+        <td class="${low ? 'overdue' : ''}">${cell('qty', it.qty)}</td>
+        <td>${cell('seuil', it.seuil)}</td>
+        <td>${cell('forecast', it.forecast)}</td>
+        <td>${cell('leadTime', it.leadTime)}</td>
+        <td>${cell('price', it.price, '0.01')}</td>
+        <td>${fc.days != null ? fc.days + ' j' : '∞'}</td>
+        <td>${fc.rupture ? frDate(fc.rupture) : '—'}</td>
+        <td class="${fc.alert ? 'overdue' : ''}">${fc.reorderBy ? frDate(fc.reorderBy) : '—'}</td>
+        <td style="white-space:nowrap">
+          <button class="tbtn" data-restock="${it.id}" title="Réception appro (+)">📥</button>
+          <button class="tbtn" data-delstock="${it.id}" title="Supprimer">🗑️</button>
+        </td></tr>`;
+    }).join('') : '<tr><td colspan="10" class="muted">Aucun produit en stock. Ajoutez-en ci-dessous.</td></tr>';
+  }
+
+  function renderAlerts() {
+    const items = Store.getStock().filter(it => Store.stockForecast(it).alert);
+    $('#stock-alerts').innerHTML = items.length
+      ? `<div class="alert-grid">${items.map(it => {
+          const fc = Store.stockForecast(it);
+          return `<div class="alert-card">
+            <strong>${esc(it.name)}</strong>
+            <span>Stock : ${(+it.qty || 0)} ${(+it.qty || 0) <= (+it.seuil || 0) ? '⚠️ sous le seuil' : ''}</span>
+            <span class="muted">${fc.reorderBy ? 'À commander avant le ' + frDate(fc.reorderBy) : 'Seuil atteint'}${fc.rupture ? ' · rupture ~' + frDate(fc.rupture) : ''}</span>
+          </div>`;
+        }).join('')}</div>`
+      : '<p class="muted">✅ Aucun réapprovisionnement urgent.</p>';
+  }
+
+  /* ---- Commandes ---- */
+  function refreshSelectors() {
+    $('#o-product').innerHTML = Store.getStock().map(s => `<option value="${s.id}">${esc(s.name)} (stock ${(+s.qty || 0)})</option>`).join('')
+      || '<option value="">— Ajoutez d\'abord des produits —</option>';
+    $('#o-contact').innerHTML = '<option value="">—</option>' +
+      Store.all().map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  }
+
+  function renderDraft() {
+    $('#o-lines').innerHTML = draftLines.length ? draftLines.map((l, i) =>
+      `<div class="mini-row"><span><strong>${l.qty}×</strong> ${esc(l.name)}</span><button class="tbtn" data-rmline="${i}">✕</button></div>`).join('')
+      : '<span class="muted">Aucune ligne. Ajoutez un produit ci-dessus.</span>';
+  }
+
+  function addLine() {
+    const sid = $('#o-product').value, qty = +$('#o-qty').value;
+    if (!sid || !qty) { alert('Choisissez un produit et une quantité.'); return; }
+    const it = Store.getStockItem(sid);
+    draftLines.push({ stockId: sid, name: it.name, qty });
+    $('#o-qty').value = '';
+    renderDraft();
+  }
+
+  function saveOrder() {
+    if (!draftLines.length) { alert('Ajoutez au moins une ligne.'); return; }
+    Store.addOrder({
+      date: $('#o-date').value || new Date().toISOString().slice(0, 10),
+      contactId: $('#o-contact').value || '',
+      lines: draftLines.slice(),
+      note: $('#o-note').value.trim()
+    });
+    draftLines = [];
+    $('#o-note').value = '';
+    render();
+    alert('Commande enregistrée — stock débité ✓');
+  }
+
+  function renderOrders() {
+    const orders = Store.getOrders().slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    $('#orders-list').innerHTML = orders.length ? `<div class="table-wrap"><table class="crm-table"><tbody>${
+      orders.map(o => {
+        const client = o.contactId ? (Store.get(o.contactId)?.name || '') : '';
+        const lines = o.lines.map(l => `${l.qty}× ${esc(l.name)}`).join(', ');
+        return `<tr>
+          <td><strong>${frDate(o.date)}</strong>${client ? '<br><small class="muted">' + esc(client) + '</small>' : ''}</td>
+          <td>${lines}${o.note ? '<br><small class="muted">' + esc(o.note) + '</small>' : ''}</td>
+          <td style="white-space:nowrap"><button class="tbtn" data-delorder="${o.id}" title="Annuler (recrédite le stock)">↩️</button></td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`
+      : '<p class="muted">Aucune commande enregistrée.</p>';
+  }
+
+  function render() {
+    renderAlerts(); renderInventory(); refreshSelectors(); renderDraft(); renderOrders();
+  }
+
+  return { render, addLine, saveOrder, draft: () => draftLines, rmLine: i => { draftLines.splice(i, 1); renderDraft(); } };
+})();
+
+/* === js/cloud.js === */
+/* cloud.js — compte + synchronisation cloud via Supabase
+ * Stocke toutes les données métier dans une table `app_state` (1 ligne / utilisateur).
+ * La config (URL + clé anon) est conservée en local ; les identifiants restent côté Supabase. */
+const Cloud = (() => {
+  const $ = s => document.querySelector(s);
+  const CFG = 'tp_supabase';
+  let sb = null;          // client supabase
+  let user = null;        // utilisateur connecté
+  let auto = true;        // synchro auto
+  let pushTimer = null;
+  let onChange = () => {}; // callback après un pull (pour rafraîchir l'UI)
+
+  // Journal visible (debug)
+  function dbg(t) {
+    const el = document.getElementById('sb-debug'); if (!el) return;
+    const time = new Date().toLocaleTimeString('fr-FR');
+    el.innerHTML = `<div>${time} — ${t}</div>` + el.innerHTML;
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('error', e => dbg('⚠️ Erreur JS : ' + (e.message || e)));
+    window.addEventListener('unhandledrejection', e => dbg('⚠️ Promesse rejetée : ' + ((e.reason && e.reason.message) || e.reason || '')));
+  }
+
+  const getCfg = () => { try { return JSON.parse(localStorage.getItem(CFG)); } catch { return null; } };
+  const setCfg = (c) => localStorage.setItem(CFG, JSON.stringify(c));
+  const clearCfg = () => localStorage.removeItem(CFG);
+
+  function show(view) {
+    $('#cloud-config').style.display = view === 'config' ? '' : 'none';
+    $('#cloud-auth').style.display = view === 'auth' ? '' : 'none';
+    $('#cloud-session').style.display = view === 'session' ? '' : 'none';
+  }
+
+  // Initialise le client si la config existe, et restaure la session éventuelle
+  async function init(refreshCb) {
+    onChange = refreshCb || onChange;
+    const cfg = getCfg();
+    if (!cfg || !window.supabase) { show('config'); return; }
+    $('#sb-url').value = cfg.url; $('#sb-key').value = cfg.key;
+    // Un projet est déjà configuré → on affiche d'emblée l'écran de connexion
+    show('auth');
+    try {
+      sb = window.supabase.createClient(cfg.url, cfg.key);
+      const { data, error } = await sb.auth.getSession();
+      if (!error && data && data.session) { user = data.session.user; enterSession(); await pull(true); }
+      else msg('Reconnecte-toi avec ton email et ton mot de passe.', true);
+    } catch (e) {
+      // session expirée / réseau : on reste sur l'écran de login, le projet reste connecté
+      msg('Session expirée — reconnecte-toi ci-dessous.');
+    }
+  }
+
+  function connect() {
+    dbg('Clic « Connecter »…');
+    let url = $('#sb-url').value.trim(), key = $('#sb-key').value.trim();
+    url = url.replace(/\/+$/, ''); // retire un éventuel slash final
+    if (!url || !key) { dbg('✗ URL ou clé vide'); alert('Renseigne l\'URL et la clé.'); return; }
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in|net)/i.test(url)) {
+      dbg('✗ Format d\'URL invalide : ' + url);
+      alert('L\'URL du projet doit ressembler à https://xxxxxxxx.supabase.co');
+      return;
+    }
+    if (!window.supabase || !window.supabase.createClient) {
+      dbg('✗ Module Supabase non chargé (window.supabase absent)');
+      alert('Le module Supabase n\'est pas chargé (internet ou bloqueur de pub ?). Recharge la page.');
+      return;
+    }
+    try {
+      setCfg({ url, key });
+      sb = window.supabase.createClient(url, key);
+      dbg('✓ Client Supabase créé');
+    } catch (e) {
+      dbg('✗ createClient a échoué : ' + (e.message || e));
+      alert('Erreur de connexion au projet : ' + (e.message || e));
+      return;
+    }
+    show('auth');
+    dbg('→ Écran de connexion affiché. Saisis email + mot de passe.');
+    msg('Projet connecté ✓ Saisis ton email + mot de passe puis « Se connecter ».', true);
+  }
+
+  function forget() { clearCfg(); sb = null; user = null; show('config'); }
+
+  function enterSession() {
+    show('session');
+    $('#sb-user').textContent = user.email;
+    $('#sb-auto').checked = auto;
+  }
+
+  const msg = (t, ok) => { const m = $('#sb-msg'); m.textContent = t; m.style.color = ok ? 'var(--accent)' : '#ef4444'; };
+  const status = (t) => { $('#sb-status').textContent = t; };
+
+  function checkInputs() {
+    if (!sb) { msg('✗ Cliquez d\'abord sur « Connecter » (URL + clé).'); return null; }
+    const email = $('#sb-email').value.trim(), password = $('#sb-pass').value;
+    if (!email || !password) { msg('✗ Renseignez email et mot de passe.'); return null; }
+    if (password.length < 6) { msg('✗ Le mot de passe doit faire au moins 6 caractères.'); return null; }
+    return { email, password };
+  }
+
+  async function signup() {
+    const c = checkInputs(); if (!c) return;
+    msg('⏳ Création du compte…', true);
+    try {
+      const { data, error } = await sb.auth.signUp(c);
+      if (error) return msg('✗ ' + error.message);
+      if (data.session) { user = data.session.user; enterSession(); await push(); }
+      else msg('✓ Compte créé. Si la confirmation email est activée, valide le mail puis connecte-toi.', true);
+    } catch (e) { msg('✗ ' + (e.message || 'Connexion impossible (vérifie l\'URL du projet).')); }
+  }
+
+  async function login() {
+    dbg('Clic « Se connecter »…');
+    const c = checkInputs(); if (!c) { dbg('✗ Champs invalides ou projet non connecté'); return; }
+    msg('⏳ Connexion…', true); dbg('Tentative de connexion pour ' + c.email + '…');
+    try {
+      const { data, error } = await sb.auth.signInWithPassword(c);
+      if (error) { dbg('✗ Réponse Supabase : ' + error.message); return msg('✗ ' + error.message); }
+      user = data.user; enterSession(); dbg('✓ Connecté !');
+      await pull(true);
+    } catch (e) { dbg('✗ Exception : ' + (e.message || e)); msg('✗ ' + (e.message || 'Connexion impossible (vérifie l\'URL du projet).')); }
+  }
+
+  async function logout() { if (sb) await sb.auth.signOut(); user = null; show('auth'); }
+
+  // Envoie les données locales vers le cloud
+  async function push() {
+    if (!sb || !user) return;
+    status('⏳ Envoi…');
+    const payload = { user_id: user.id, data: Store.exportAll(), updated_at: new Date().toISOString() };
+    const { error } = await sb.from('app_state').upsert(payload, { onConflict: 'user_id' });
+    status(error ? '✗ ' + error.message : '✓ Synchronisé ' + new Date().toLocaleTimeString('fr-FR'));
+  }
+
+  // Récupère les données du cloud et remplace les données locales
+  async function pull(silent) {
+    if (!sb || !user) return;
+    status('⏳ Chargement…');
+    const { data, error } = await sb.from('app_state').select('data').eq('user_id', user.id).maybeSingle();
+    if (error) return status('✗ ' + error.message);
+    if (!data) { status('Aucune donnée cloud — envoi des données locales…'); await push(); onChange(); return; }
+    if (!silent && !confirm('Remplacer les données de cet appareil par celles du cloud ?')) return;
+    Store.importAll(data.data);
+    status('✓ Données chargées ' + new Date().toLocaleTimeString('fr-FR'));
+    onChange();
+  }
+
+  // Appelé par l'app après chaque modification → push différé
+  function notifyChange() {
+    if (!sb || !user || !auto) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(push, 2500);
+  }
+
+  function bind() {
+    const c = $('#sb-connect');
+    if (!c) { dbg('✗ Bouton Connecter introuvable au chargement'); return; }
+    c.addEventListener('click', connect);
+    $('#sb-forget').addEventListener('click', forget);
+    $('#sb-login').addEventListener('click', login);
+    $('#sb-signup').addEventListener('click', signup);
+    $('#sb-logout').addEventListener('click', logout);
+    $('#sb-pull').addEventListener('click', () => pull(false));
+    $('#sb-push').addEventListener('click', push);
+    $('#sb-auto').addEventListener('change', e => auto = e.target.checked);
+    dbg('Module cloud prêt (boutons actifs) · SDK Supabase ' + (window.supabase ? 'chargé ✓' : 'ABSENT ✗'));
+  }
+
+  return { init, bind, notifyChange, isOn: () => !!user };
+})();
+
+/* === js/app.js === */
+/* app.js — orchestration : carte, navigation, tournée */
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+
+  // État de la tournée
+  let depot = null;            // { lat, lng, label }
+  let stops = [];              // [client]
+  let map, routeLayer, markerLayer;
+  let lastResult = null;       // pour l'export
+
+  /* ---------- CARTE ---------- */
+  function initMap() {
+    map = L.map('map').setView([48.8566, 2.3522], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+    routeLayer = L.layerGroup().addTo(map);
+  }
+
+  function numIcon(txt, depotStyle) {
+    return L.divIcon({
+      className: '',
+      html: `<div class="leaflet-marker-num ${depotStyle ? 'leaflet-marker-depot' : ''}">${txt}</div>`,
+      iconSize: [26, 26], iconAnchor: [13, 13]
+    });
+  }
+
+  function redrawMarkers() {
+    markerLayer.clearLayers();
+    const pts = [];
+    if (depot) {
+      L.marker([depot.lat, depot.lng], { icon: numIcon('D', true) })
+        .bindPopup('<b>Dépôt</b><br>' + (depot.label || '')).addTo(markerLayer);
+      pts.push([depot.lat, depot.lng]);
+    }
+    stops.forEach((s, i) => {
+      if (s.lat) {
+        L.marker([s.lat, s.lng], { icon: numIcon(i + 1) })
+          .bindPopup(`<b>${i + 1}. ${s.name}</b><br>${s.address || ''}`).addTo(markerLayer);
+        pts.push([s.lat, s.lng]);
+      }
+    });
+    if (pts.length) map.fitBounds(pts, { padding: [40, 40] });
+  }
+
+  function drawRoute(geometry) {
+    routeLayer.clearLayers();
+    L.geoJSON(geometry, { style: { color: '#d97757', weight: 5, opacity: .75 } }).addTo(routeLayer);
+  }
+
+  /* ---------- NAVIGATION ---------- */
+  $$('.tab').forEach(t => t.addEventListener('click', () => {
+    $$('.tab').forEach(x => x.classList.remove('active'));
+    $$('.view').forEach(v => v.classList.remove('active'));
+    t.classList.add('active');
+    $('#view-' + t.dataset.view).classList.add('active');
+    if (t.dataset.view === 'plan') setTimeout(() => map.invalidateSize(), 100);
+    if (t.dataset.view === 'field') { Field.refreshTourSelect(); Field.render(); }
+    if (t.dataset.view === 'crm') { CRM.fill(null); CRM.setStage(t.dataset.stage); }
+    if (t.dataset.view === 'agenda') { Agenda.render(); }
+    if (t.dataset.view === 'kpi') { KPI.render(); }
+    if (t.dataset.view === 'settings') { Agenda.loadStatusEditors(); KPI.loadObjectives(); loadCostDefaults(); $('#prod-list').value = Store.getProducts().join('\n'); }
+    if (t.dataset.view === 'stock') { if (!$('#o-date').value) $('#o-date').value = new Date().toISOString().slice(0, 10); Stock.render(); }
+  }));
+
+  /* ---------- STOCK & COMMANDES ---------- */
+  $('#sa-add').addEventListener('click', () => {
+    const name = $('#sa-name').value.trim();
+    if (!name) { alert('Nom du produit requis.'); return; }
+    Store.saveStockItem({
+      name, qty: +$('#sa-qty').value || 0, seuil: +$('#sa-seuil').value || 0,
+      forecast: +$('#sa-forecast').value || 0, leadTime: +$('#sa-lead').value || 0, price: +$('#sa-price').value || 0
+    });
+    ['#sa-name', '#sa-qty', '#sa-seuil', '#sa-forecast', '#sa-lead', '#sa-price'].forEach(s => $(s).value = '');
+    Stock.render();
+  });
+  // édition inline des cellules d'inventaire
+  $('#stock-body').addEventListener('change', e => {
+    const inp = e.target.closest('.cell-in'); if (!inp) return;
+    const val = inp.dataset.k === 'name' ? inp.value : (+inp.value || 0);
+    Store.patchStock(inp.dataset.sid, { [inp.dataset.k]: val });
+    Stock.render();
+  });
+  $('#stock-body').addEventListener('click', e => {
+    const rs = e.target.closest('[data-restock]'); const dl = e.target.closest('[data-delstock]');
+    if (rs) { const q = prompt('Quantité reçue à ajouter au stock :'); if (q) { Store.restock(rs.dataset.restock, +q || 0); Stock.render(); } }
+    if (dl && confirm('Supprimer ce produit du stock ?')) { Store.removeStockItem(dl.dataset.delstock); Stock.render(); }
+  });
+  $('#o-addline').addEventListener('click', () => Stock.addLine());
+  $('#o-lines').addEventListener('click', e => {
+    const r = e.target.closest('[data-rmline]'); if (r) Stock.rmLine(+r.dataset.rmline);
+  });
+  $('#o-save').addEventListener('click', () => Stock.saveOrder());
+  $('#orders-list').addEventListener('click', e => {
+    const d = e.target.closest('[data-delorder]');
+    if (d && confirm('Annuler cette commande ? Le stock sera recrédité.')) { Store.removeOrder(d.dataset.delorder); Stock.render(); }
+  });
+
+  /* ---------- PARAMÈTRES : catalogue produits ---------- */
+  $('#prod-save').addEventListener('click', () => {
+    const list = $('#prod-list').value.split('\n').map(s => s.trim()).filter(Boolean);
+    Store.saveProducts(list);
+    CRM.populateFilters();
+    alert('Catalogue produits enregistré ✓');
+  });
+
+  // reflet visuel des chips produits cochés dans la fiche
+  $('#c-products').addEventListener('change', e => {
+    const lbl = e.target.closest('.chip'); if (lbl) lbl.classList.toggle('on', e.target.checked);
+  });
+
+  /* ---------- PARAMÈTRES : coûts par défaut ---------- */
+  function loadCostDefaults() {
+    const s = Store.getSettings();
+    $('#set-fuel').value = s.fuel;
+    $('#set-consumption').value = s.consumption;
+    $('#set-stoptime').value = s.stopTime;
+    $('#set-hourly').value = s.hourly;
+  }
+  /* ---------- DONNÉES : export / import fichier ---------- */
+  $('#data-export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(Store.exportAll(), null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tourneepro_sauvegarde_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+  });
+  $('#data-import').addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    if (!confirm('Importer ce fichier remplacera les données de cet appareil. Continuer ?')) { e.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { Store.importAll(JSON.parse(reader.result)); refreshAllViews(); alert('Données importées ✓'); }
+      catch (err) { alert('Erreur : ' + err.message); }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  /* ---------- Rafraîchit toutes les vues après import/synchro ---------- */
+  function refreshAllViews() {
+    CRM.fill(null); CRM.render();
+    refreshClientPicker(); refreshTourLoad();
+    Field.refreshTourSelect(); Field.render();
+    Agenda.render(); KPI.render(); Stock.render();
+    loadCostDefaults(); Agenda.loadStatusEditors(); KPI.loadObjectives();
+  }
+
+  $('#set-save').addEventListener('click', () => {
+    Store.saveSettings({
+      fuel: +$('#set-fuel').value || 0,
+      consumption: +$('#set-consumption').value || 0,
+      stopTime: +$('#set-stoptime').value || 0,
+      hourly: +$('#set-hourly').value || 0
+    });
+    alert('Valeurs par défaut enregistrées ✓');
+  });
+
+  /* ---------- KPI ---------- */
+  document.querySelectorAll('#kpi-period .seg-btn').forEach(b =>
+    b.addEventListener('click', () => KPI.setPeriod(b.dataset.p)));
+  $('#obj-save').addEventListener('click', () => { KPI.saveObjectives(); alert('Objectifs enregistrés ✓'); });
+
+  /* ---------- AGENDA / CA / STATUTS ---------- */
+  $('#ca-from').addEventListener('change', () => Agenda.renderDashboard());
+  $('#ca-to').addEventListener('change', () => Agenda.renderDashboard());
+  $('#agenda-filter').addEventListener('change', () => Agenda.renderRelances());
+
+  /* ---------- TÂCHES (agenda) ---------- */
+  $('#task-add').addEventListener('click', () => {
+    const text = $('#task-text').value.trim();
+    if (!text) return;
+    Store.addTask(text, $('#task-date').value);
+    $('#task-text').value = ''; $('#task-date').value = '';
+    Agenda.renderTasks();
+  });
+  $('#task-text').addEventListener('keydown', e => { if (e.key === 'Enter') $('#task-add').click(); });
+  $('#task-list').addEventListener('click', e => {
+    const chk = e.target.closest('[data-task]'); const del = e.target.closest('[data-taskdel]');
+    if (chk) { Store.toggleTask(chk.dataset.task); Agenda.renderTasks(); }
+    if (del) { Store.removeTask(del.dataset.taskdel); Agenda.renderTasks(); }
+  });
+
+  $('#st-save').addEventListener('click', () => {
+    const parse = v => v.split('\n').map(s => s.trim()).filter(Boolean);
+    const prospect = parse($('#st-prospect').value);
+    const client = parse($('#st-client').value);
+    if (!prospect.length || !client.length) { alert('Chaque liste doit contenir au moins un statut.'); return; }
+    Store.saveStatuses({ prospect, client });
+    alert('Statuts enregistrés ✓');
+  });
+  $('#st-reset').addEventListener('click', () => {
+    if (!confirm('Réinitialiser les statuts par défaut ?')) return;
+    Store.resetStatuses();
+    Agenda.loadStatusEditors();
+  });
+
+  /* ---------- SAUVEGARDE / CHARGEMENT DE TOURNÉES ---------- */
+  let currentTourId = null; // tournée en cours d'édition (vue Tournée)
+
+  function refreshTourLoad() {
+    const sel = $('#tour-load');
+    const tours = Store.getTours().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+      tours.map(t => `<option value="${t.id}">${t.name}${t.recurring ? ' ♻︎' : ''}</option>`).join('');
+    if (currentTourId) sel.value = currentTourId;
+  }
+
+  $('#tour-save').addEventListener('click', () => {
+    const name = $('#tour-name').value.trim();
+    if (!name) { alert('Donnez un nom à la tournée.'); return; }
+    if (!depot) { alert('Définissez le point de départ.'); return; }
+    if (!stops.length) { alert('Ajoutez au moins un arrêt.'); return; }
+    const existing = currentTourId ? Store.getTour(currentTourId) : null;
+    const tour = Store.saveTour({
+      id: currentTourId || '',
+      name,
+      recurring: $('#tour-recurring').checked,
+      depot,
+      stopIds: stops.map(s => s.id),
+      returnDepot: $('#return-depot').checked,
+      settings: readSettings()
+    });
+    currentTourId = tour.id;
+    refreshTourLoad();
+    alert('Tournée « ' + name + ' » enregistrée ✓');
+  });
+
+  $('#tour-load').addEventListener('change', e => {
+    const t = Store.getTour(e.target.value);
+    if (!t) { currentTourId = null; return; }
+    currentTourId = t.id;
+    depot = t.depot;
+    $('#depot-input').value = t.depot.label || '';
+    $('#depot-status').textContent = '✓ ' + (t.depot.label || '');
+    stops = t.stopIds.map(id => Store.get(id)).filter(Boolean);
+    $('#return-depot').checked = t.returnDepot;
+    $('#tour-name').value = t.name;
+    $('#tour-recurring').checked = !!t.recurring;
+    if (t.settings) Store.saveSettings(t.settings);
+    renderStops();
+  });
+
+  $('#tour-delete').addEventListener('click', () => {
+    const id = $('#tour-load').value;
+    if (!id) return;
+    if (!confirm('Supprimer cette tournée enregistrée ?')) return;
+    Store.removeTour(id);
+    if (currentTourId === id) currentTourId = null;
+    refreshTourLoad();
+    Field.refreshTourSelect();
+  });
+
+  /* ---------- VUE TERRAIN ---------- */
+  $$('.fmode').forEach(b => b.addEventListener('click', () => Field.setMode(b.dataset.mode)));
+  $('#field-date').addEventListener('change', () => Field.render());
+  $('#field-stage-filter').addEventListener('change', () => Field.render());
+  $('#field-tour-select').addEventListener('change', () => Field.render());
+  $('#field-hide-done').addEventListener('change', () => Field.render());
+  $('#field-list').addEventListener('click', e => {
+    const st = e.target.closest('.st-btn');
+    if (st) { Field.handleStatusClick(st.dataset.cid, st.dataset.status); return; }
+    const cmt = e.target.closest('.cmt-add');
+    if (cmt) {
+      const input = cmt.parentElement.querySelector('.cmt-input');
+      Field.handleComment(cmt.dataset.cid, input.value);
+    }
+  });
+  $('#field-list').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.classList.contains('cmt-input')) {
+      Field.handleComment(e.target.dataset.cid, e.target.value);
+    }
+  });
+
+  /* ---------- CRM ---------- */
+  function refreshClientPicker() {
+    const sel = $('#client-picker');
+    const f = ($('#client-search').value || '').toLowerCase();
+    const list = Store.all()
+      .filter(c => !f || (c.name + (c.address || '') + c.businessType).toLowerCase().includes(f))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    sel.size = f && list.length > 1 ? Math.min(list.length, 6) : 1;
+    sel.innerHTML = list.length
+      ? list.map(c => `<option value="${c.id}">${c.name}${c.lat ? '' : ' (non localisé)'}</option>`).join('')
+      : '<option value="">Aucun résultat</option>';
+  }
+  $('#client-search').addEventListener('input', refreshClientPicker);
+
+  $('#c-btype').addEventListener('change', () => CRM.toggleSub());
+  $('#c-relance').addEventListener('change', () => CRM.toggleRelance());
+
+  $('#c-save').addEventListener('click', () => {
+    const c = CRM.fields();
+    if (!c.name || !c.address) { alert('Nom et adresse obligatoires.'); return; }
+    const saved = Store.upsert(c);
+    CRM.fill(saved);                  // recharge avec l'id pour gérer deals/passages
+    CRM.render();
+    refreshClientPicker();
+    $('#c-save-status') && ($('#c-save-status').textContent = 'Enregistré ✓');
+  });
+  $('#c-reset').addEventListener('click', () => CRM.fill(null));
+
+  $('#c-convert').addEventListener('click', () => {
+    const id = CRM.getCurrentId();
+    if (!id) return;
+    if (!confirm('Basculer ce prospect en client ?')) return;
+    Store.convertToClient(id);
+    CRM.fill(null);
+    CRM.setStage('client');
+    // bascule l'onglet visuel
+    $$('.tab').forEach(x => x.classList.toggle('active', x.dataset.stage === 'client'));
+  });
+
+  // Ajout / suppression de deals
+  $('#d-add').addEventListener('click', () => {
+    const deal = { date: $('#d-date').value || new Date().toISOString().slice(0, 10), amount: +$('#d-amount').value || 0, label: $('#d-label').value.trim() };
+    if (!deal.amount) { alert('Indiquez un montant.'); return; }
+    const id = CRM.getCurrentId();
+    if (id) { Store.addDeal(id, deal); CRM.renderDeals(); CRM.render(); }
+    else CRM.addDraftDeal(deal);
+    $('#d-amount').value = ''; $('#d-label').value = '';
+  });
+
+  $('#deals-list').addEventListener('click', e => {
+    const id = e.target.dataset.dealDel; if (!id) return;
+    const cid = CRM.getCurrentId();
+    if (cid) { Store.removeDeal(cid, id); CRM.renderDeals(); CRM.render(); }
+    else CRM.rmDraftDeal(id);
+  });
+
+  $('#visits-list').addEventListener('click', e => {
+    const id = e.target.dataset.visitDel; if (!id) return;
+    const cid = CRM.getCurrentId();
+    if (cid) { Store.removeVisit(cid, id); CRM.renderVisits(); CRM.render(); }
+    else CRM.rmDraftVisit(id);
+  });
+
+  $('#c-geocode').addEventListener('click', async () => {
+    const addr = $('#c-address').value.trim();
+    if (!addr) return;
+    $('#c-geo-status').textContent = '⏳ Localisation…';
+    try {
+      const g = await Geo.geocode(addr);
+      $('#c-id').dataset.lat = g.lat;
+      $('#c-id').dataset.lng = g.lng;
+      $('#c-geo-status').textContent = `✓ ${g.label}`;
+    } catch (e) { $('#c-geo-status').textContent = '✗ ' + e.message; }
+  });
+
+  $('#crm-body').addEventListener('click', e => {
+    const exp = e.target.closest('[data-expand]');
+    if (exp) { CRM.toggleExpand(exp.dataset.expand); return; }
+    const ed = e.target.closest('[data-edit]')?.dataset.edit;
+    const dl = e.target.closest('[data-del]')?.dataset.del;
+    if (ed) { CRM.fill(Store.get(ed)); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (dl && confirm('Supprimer cette fiche ?')) {
+      Store.remove(dl); CRM.fill(null); CRM.render(); refreshClientPicker();
+    }
+  });
+  // édition directe dans le tableau (statut / priorité)
+  $('#crm-body').addEventListener('change', e => {
+    const sel = e.target.closest('.inline-sel'); if (!sel) return;
+    const c = Store.get(sel.dataset.cid); if (!c) return;
+    c[sel.dataset.inline] = sel.value;
+    if (sel.dataset.inline === 'prospectStatus' && sel.value === 'Gagné') c.stage = 'client';
+    Store.upsert(c);
+    CRM.render();
+  });
+  $('#crm-search').addEventListener('input', () => CRM.render());
+  ['#f-priority', '#f-btype', '#f-status', '#f-product', '#f-sort', '#f-ca-min', '#f-ca-max'].forEach(sel =>
+    $(sel).addEventListener('input', () => CRM.render()));
+  $('#f-clear').addEventListener('click', () => {
+    ['#f-priority', '#f-btype', '#f-status', '#f-product', '#f-ca-min', '#f-ca-max'].forEach(s => $(s).value = '');
+    $('#f-sort').value = 'name'; $('#crm-search').value = ''; CRM.render();
+  });
+
+  /* ---------- TOURNÉE : dépôt ---------- */
+  $('#depot-set').addEventListener('click', async () => {
+    const addr = $('#depot-input').value.trim();
+    if (!addr) return;
+    $('#depot-status').textContent = '⏳ Localisation…';
+    try {
+      depot = await Geo.geocode(addr);
+      $('#depot-status').textContent = `✓ ${depot.label}`;
+      redrawMarkers();
+    } catch (e) { $('#depot-status').textContent = '✗ ' + e.message; }
+  });
+
+  /* ---------- TOURNÉE : arrêts ---------- */
+  function renderStops() {
+    $('#stop-count').textContent = stops.length;
+    $('#stop-list').innerHTML = stops.map((s, i) => `
+      <li>
+        <span class="num">${i + 1}</span>
+        <span class="nm">${s.name}${s.lat ? '' : ' ⚠️'}</span>
+        <span class="ord">
+          <button data-up="${i}">▲</button>
+          <button data-down="${i}">▼</button>
+        </span>
+        <button class="rm" data-rm="${i}">×</button>
+      </li>`).join('') || '<li class="muted">Aucun arrêt.</li>';
+    redrawMarkers();
+    updateEnjeu();
+  }
+
+  // Enjeu CA de la tournée : potentiel des prospects + CA déjà contracté des arrêts
+  function updateEnjeu() {
+    const eur = v => (+v || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+    const pot = stops.reduce((s, c) => s + (c.stage === 'prospect' ? (+c.potentiel || 0) : 0), 0);
+    const contracted = stops.reduce((s, c) => s + Store.dealsTotal(c), 0);
+    if (!stops.length) { $('#enjeu-pot').textContent = '—'; $('#enjeu-sub').textContent = 'ajoutez des arrêts'; return; }
+    $('#enjeu-pot').textContent = eur(pot);
+    $('#enjeu-sub').textContent = `potentiel à aller chercher · ${eur(contracted)} déjà contractés`;
+  }
+
+  $('#add-stop').addEventListener('click', () => {
+    const id = $('#client-picker').value;
+    const c = Store.get(id);
+    if (!c) return;
+    if (!c.lat) { alert('Ce client n\'est pas localisé. Géolocalisez-le dans le CRM.'); return; }
+    if (stops.find(s => s.id === id)) { alert('Déjà dans la tournée.'); return; }
+    stops.push(c);
+    renderStops();
+  });
+
+  $('#stop-list').addEventListener('click', e => {
+    const { up, down, rm } = e.target.dataset;
+    if (rm !== undefined) stops.splice(+rm, 1);
+    else if (up !== undefined && +up > 0) [stops[+up - 1], stops[+up]] = [stops[+up], stops[+up - 1]];
+    else if (down !== undefined && +down < stops.length - 1) [stops[+down + 1], stops[+down]] = [stops[+down], stops[+down + 1]];
+    else return;
+    renderStops();
+  });
+
+  $('#optimize').addEventListener('click', () => {
+    if (!depot) { alert('Définissez d\'abord le point de départ.'); return; }
+    if (stops.length < 2) return;
+    stops = Geo.optimizeOrder(depot, stops);
+    renderStops();
+  });
+
+  /* ---------- TOURNÉE : calcul ---------- */
+  // Les coûts sont gérés dans Paramètres → on lit les valeurs enregistrées
+  function readSettings() { return Store.getSettings(); }
+
+  $('#calc').addEventListener('click', async () => {
+    if (!depot) { alert('Définissez le point de départ.'); return; }
+    if (!stops.length) { alert('Ajoutez au moins un arrêt.'); return; }
+
+    const pts = [depot, ...stops.map(s => ({ lat: s.lat, lng: s.lng }))];
+    if ($('#return-depot').checked) pts.push(depot);
+
+    $('#calc').textContent = '⏳ Calcul en cours…';
+    $('#calc').disabled = true;
+    try {
+      const rd = await Geo.route(pts);
+      const settings = readSettings();
+      const r = RouteCalc.compute(rd, settings, stops.length);
+      lastResult = { rd, r, settings };
+
+      drawRoute(rd.geometry);
+
+      $('#r-distance').textContent = RouteCalc.fmtKmN(r.km);
+      $('#r-driving').textContent = RouteCalc.fmtDuration(r.drivingMin);
+      $('#r-total-time').textContent = RouteCalc.fmtDuration(r.totalMin);
+      $('#r-stops').textContent = stops.length;
+      $('#r-fuel').textContent = RouteCalc.fmtEur(r.fuelCost);
+      $('#r-liters').textContent = RouteCalc.fmtL(r.liters);
+      $('#r-labor').textContent = RouteCalc.fmtEur(r.laborCost);
+      $('#r-total-cost').textContent = RouteCalc.fmtEur(r.totalCost);
+
+      renderRoadbook(rd, settings);
+    } catch (e) {
+      alert('Erreur : ' + e.message + '\n(Vérifiez votre connexion internet — le routage utilise OSRM.)');
+    } finally {
+      $('#calc').textContent = '🧮 Calculer la tournée';
+      $('#calc').disabled = false;
+    }
+  });
+
+  // Calcule l'horaire de passage à chaque nœud (si heure de départ fournie)
+  function computeSchedule(rd, settings) {
+    const start = RouteCalc.parseClock($('#depart-time').value);
+    if (start == null) return null;
+    const ret = $('#return-depot').checked;
+    const n = stops.length + (ret ? 1 : 0); // nœuds après le dépôt
+    const arr = [start]; // arrivée/heure à chaque nœud (0 = dépôt départ)
+    let t = start;
+    for (let i = 0; i < n; i++) {
+      t += (rd.legs[i]?.duration || 0) / 60;        // trajet
+      arr.push(t);                                   // arrivée au nœud i+1
+      const isClient = i < stops.length;             // dernier = dépôt retour
+      if (isClient) t += settings.stopTime;          // temps sur place
+    }
+    return arr;
+  }
+
+  function renderRoadbook(rd, settings) {
+    const ret = $('#return-depot').checked;
+    const seq = [{ name: 'Dépôt (départ)' }, ...stops, ...(ret ? [{ name: 'Dépôt (retour)' }] : [])];
+    const sched = computeSchedule(rd, settings);
+    let html = '';
+    seq.forEach((node, i) => {
+      const clock = sched ? `<span class="slot">${RouteCalc.fmtClock(sched[i])}</span> ` : '';
+      html += `<li>${clock}<strong>${node.name}</strong>`;
+      if (i < seq.length - 1 && rd.legs[i]) {
+        const leg = rd.legs[i];
+        html += `<div class="leg">↓ ${RouteCalc.fmtKmN(leg.distance / 1000)} · ${RouteCalc.fmtDuration(leg.duration / 60)} de route`;
+        if (i > 0 && i <= stops.length) html += ` · +${settings.stopTime} min sur place`;
+        html += `</div>`;
+      }
+      html += `</li>`;
+    });
+    $('#roadbook').innerHTML = html;
+  }
+
+  /* ---------- EXPORT CSV ---------- */
+  $('#export-csv').addEventListener('click', () => {
+    if (!lastResult) { alert('Calculez d\'abord la tournée.'); return; }
+    const { rd, r, settings } = lastResult;
+    const ret = $('#return-depot').checked;
+    const sched = computeSchedule(rd, settings);
+    const rows = [['Ordre', 'Créneau', 'Client', 'Adresse', 'Distance segment (km)', 'Temps route (min)']];
+    const seq = [{ name: 'Dépôt', address: depot.label }, ...stops, ...(ret ? [{ name: 'Dépôt (retour)', address: depot.label }] : [])];
+    seq.forEach((n, i) => {
+      const leg = rd.legs[i];
+      rows.push([i, sched ? RouteCalc.fmtClock(sched[i]) : '', n.name, (n.address || '').replace(/[;,\n]/g, ' '),
+        leg ? (leg.distance / 1000).toFixed(1) : '', leg ? Math.round(leg.duration / 60) : '']);
+    });
+    rows.push([]);
+    rows.push(['TOTAL distance (km)', r.km.toFixed(1)]);
+    rows.push(['Durée totale', RouteCalc.fmtDuration(r.totalMin)]);
+    rows.push(['Litres consommés', r.liters.toFixed(2)]);
+    rows.push(['Coût carburant (€)', r.fuelCost.toFixed(2)]);
+    rows.push(['Coût main d\'œuvre (€)', r.laborCost.toFixed(2)]);
+    rows.push(['COÛT TOTAL (€)', r.totalCost.toFixed(2)]);
+    rows.push([]);
+    rows.push(['Paramètres', `${settings.fuel} €/L · ${settings.consumption} L/100km · ${settings.stopTime} min/arrêt · ${settings.hourly} €/h`]);
+
+    const csv = rows.map(r => r.join(';')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tournee_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+  });
+
+  /* ---------- INIT ---------- */
+  function init() {
+    initMap();
+    CRM.fill(null);
+    CRM.setStage('prospect');
+    const td = new Date().toISOString().slice(0, 10);
+    $('#field-date').value = td;
+    $('#ca-from').value = td.slice(0, 4) + '-01-01';
+    $('#ca-to').value = td;
+    refreshClientPicker();
+    refreshTourLoad();
+    Field.refreshTourSelect();
+    renderStops();
+    // Cloud : config, session et synchro auto
+    Cloud.bind();
+    Cloud.init(refreshAllViews);
+    Store.onSave(() => Cloud.notifyChange());
+  }
+  init();
+})();
+
+  </script>
+</body>
+</html>
